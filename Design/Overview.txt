@@ -1,0 +1,35 @@
+Goals
+	Encapsulated environment where users can write and run code on in-game computers
+	Progress from simple assembly to higher level languages
+	Access to in-game devices such as displays or vehicle steering / throttle
+	Limited speed / storage based on how the in-game computer was built
+Asm
+	Instructions
+		mov		src, dst
+		add		src, dst
+		mul		src, dst
+		inc		dst
+		dec		dst
+		neg		dst
+		not		dst
+		xor		src, dst
+		or		src, dst
+		and		src, dst
+		tst		x, y		//set flags by y & x
+		cmp		x, y		//set flags by y - x
+		je		label		//jump if equal
+		jne		label		//jump if not equal
+		jg		label		//jump if greater than
+		jge		label		//jump if greater than or equal
+		jl		label		//jump if less than
+		jle		label		//jump if less than or equal
+		cmove	src, dst	//mov if equal
+		cmovne	src, dst	//mov if not equal
+		cmovg	src, dst	//mov if greater than
+		cmovge	src, dst	//mov if greater than or equal
+		cmovl	src, dst	//mov if less than
+		cmovle	src, dst	//mov if less than or equal
+	Flags
+		CF	carry
+		ZF	zero
+		SF	sign
