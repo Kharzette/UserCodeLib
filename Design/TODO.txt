@@ -1,0 +1,8 @@
+x	Proper error reporting with line numbers
+x	Numerical constants as arguments
+	Variables
+	Functions
+	Writable screen device memory
+	Filesystem
+	Text editor
+	Convert register mnemonic to a numerical address via the register module

@@ -45,6 +45,22 @@ namespace UserCodeLib
 			return	mCur;
 		}
 
+		internal int GetAddressSize()
+		{
+			if(Is16Bit())
+			{
+				return	2;
+			}
+			else if(Is32Bit())
+			{
+				return	4;
+			}
+			else
+			{
+				return	8;
+			}
+		}
+
 		internal void SetPointer(UInt64 loc)
 		{
 			mCur	=loc;

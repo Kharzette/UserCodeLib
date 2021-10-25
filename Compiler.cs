@@ -9,11 +9,23 @@ namespace UserCodeLib
 		Dictionary<string, byte>	mInstructions	=new Dictionary<string, byte>();
 		Dictionary<byte, int>		mNumOperands	=new Dictionary<byte, int>();
 
+		Screen	mScreen;
+
 		const UInt32	ExeMagic	=0xF00CF00D;	//exe marker
+		const byte		SrcRegister	=0x1;
+		const byte		SrcAddress	=0x2;
+		const byte		SrcLabel	=0x4;
+		const byte		SrcNumber	=0x8;
+		const byte		DstRegister	=0x1 << 4;
+		const byte		DstAddress	=0x2 << 4;
+		const byte		DstLabel	=0x4 << 4;
+		const byte		DstNumber	=0x8 << 4;
 
 
-		internal Compiler()
+		internal Compiler(Screen scr)
 		{
+			mScreen	=scr;
+
 			Init();
 		}
 
@@ -49,11 +61,11 @@ namespace UserCodeLib
 			}
 
 			src.BaseStream.Seek(0, SeekOrigin.Begin);
-			for(;;)
+			for(int i=0;;i++)
 			{
 				string	line	=src.ReadLine();
 
-				if(!ParseLine(line, labels, labelAddrs, exe))
+				if(!ParseLine(line, i, labels, labelAddrs, exe))
 				{
 					return	false;
 				}
@@ -69,101 +81,81 @@ namespace UserCodeLib
 			//buzz through compiled code and fix labels
 			exe.SetPointer(4);
 
-			for(;;)
+			for(int lineNum=0;;lineNum++)
 			{
 				byte	instruction	=exe.ReadByte();
 
+				int	numArgs	=mNumOperands[instruction];
+				if(numArgs == 0)
+				{
+					continue;
+				}
+
 				byte	args	=exe.ReadByte();
-				if((args & 0x4) != 0)
+				if(IsArgFlagSet(args, SrcLabel))
 				{
 					//label
-					int	labelIndex	=0;
-					if(exe.Is16Bit())
-					{
-						labelIndex	=exe.ReadWord();
-					}
-					else if(exe.Is32Bit())
-					{
-						labelIndex	=(int)exe.ReadDWord();
-					}
-					else if(exe.Is64Bit())
-					{
-						labelIndex	=(int)exe.ReadQWord();
-					}
-
+					int	labelIndex	=(int)ReadExeValue(exe);
 					if(labelIndex < 0 || labelIndex > labels.Count)
 					{
-						//some kind of error
+						mScreen.Print("Invalid label index: " + labelIndex + " at line " + lineNum);
 						return	false;
 					}
 
 					//back up pointer
 					UInt64	pointer	=exe.GetPointer();
-
-					pointer	-=8;
+					pointer	-=(UInt64)exe.GetAddressSize();
 					exe.SetPointer(pointer);
 
 					//write proper address
-					if(exe.Is16Bit())
-					{
-						exe.WriteWord((UInt16)labelAddrs[labelIndex]);
-					}
-					else if(exe.Is32Bit())
-					{
-						exe.WriteDWord((UInt32)labelAddrs[labelIndex]);
-					}
-					else if(exe.Is64Bit())
-					{
-						exe.WriteQWord(labelAddrs[labelIndex]);
-					}
+					WriteExeValue(exe, labelAddrs[labelIndex], lineNum);
 				}
-				else if((args & 0x1) != 0)
+				else if(IsArgFlagSet(args, SrcRegister))
 				{
-					//register
 					exe.ReadByte();
 				}
-				else if((args & 0x2) != 0)
+				else if(IsArgFlagSet(args, SrcAddress))
 				{
-					if(exe.Is16Bit())
-					{
-						exe.ReadWord();
-					}
-					else if(exe.Is32Bit())
-					{
-						exe.ReadDWord();
-					}
-					else if(exe.Is64Bit())
-					{
-						exe.ReadQWord();
-					}
+					ReadExeValue(exe);
+				}
+				else if(IsArgFlagSet(args, SrcNumber))
+				{
+					ReadExeValue(exe);
 				}
 
 				//one more argument?
-				if((args & 0xF0) == 0)
+				if(numArgs <= 1)
 				{
 					continue;
 				}
 
-				if((args & (0x1 << 4)) != 0)
+				if(IsArgFlagSet(args, DstRegister))
 				{
 					//register dst
 					exe.ReadByte();
 				}
+				else if(IsArgFlagSet(args, DstLabel))
+				{
+					//label
+					int	labelIndex	=(int)ReadExeValue(exe);
+					if(labelIndex < 0 || labelIndex > labels.Count)
+					{
+						mScreen.Print("Invalid label index: " + labelIndex + " at line " + lineNum);
+						return	false;
+					}
+
+					//back up pointer
+					UInt64	pointer	=exe.GetPointer();
+					pointer	-=(UInt64)exe.GetAddressSize();
+					exe.SetPointer(pointer);
+
+					//write proper address
+					WriteExeValue(exe, labelAddrs[labelIndex], lineNum);
+				}
 				else
 				{
-					//pointer or label
-					if(exe.Is16Bit())
-					{
-						exe.ReadWord();
-					}
-					else if(exe.Is32Bit())
-					{
-						exe.ReadDWord();
-					}
-					else if(exe.Is64Bit())
-					{
-						exe.ReadQWord();
-					}
+					//pointer or number
+					ReadExeValue(exe);
 				}
 
 				UInt64	curPos	=exe.GetPointer();
@@ -176,6 +168,7 @@ namespace UserCodeLib
 		}
 
 		bool ParseLine(string		codeLine,
+					   int			lineNum,
 					   List<string>	labels,
 					   List<UInt64>	labelAddrs,
 					   Ram			exe)
@@ -199,6 +192,7 @@ namespace UserCodeLib
 				if(labIdx < 0 || labIdx >= labels.Count)
 				{
 					//some error
+					mScreen.Print("Label: " + lab + " not found on line: " + lineNum);
 					return	false;
 				}
 
@@ -211,6 +205,7 @@ namespace UserCodeLib
 			string	lowerTok	=toks[0].ToLowerInvariant();
 			if(!mInstructions.ContainsKey(lowerTok))
 			{
+				mScreen.Print("Invalid instruction: " + lowerTok + " on line: " + lineNum);
 				return	false;	//syntax error or something
 			}
 
@@ -223,103 +218,72 @@ namespace UserCodeLib
 				return	exe.WriteByte(instruction);
 			}
 
-			//the next byte in the exe stream is an indicator
-			//of where the arguments are
-			//The first four bytes for src, last four for dst
-			//0 none, 1 register, 2 ram address, 4 label address
+			//the second byte in a line's exe stream is an indicator
+			//of where the arguments are:
+			//The first four bits for src, last four for dst
+			//0 none, 1 register, 2 ram address, 4 label address, 8 numerical constant
+			//I think x86 crams this into the first byte
 			byte	argIndicator	=0;
 
 			//src
 			int		tokIdx	=1;
-			UInt64	srcAddr	=0;
-			for(;tokIdx < toks.Length;)
+			UInt64	srcArg	=0;
+			for(;;)
 			{
 				string	tok	=toks[tokIdx++].ToLowerInvariant();
 
 				tok	=tok.Trim();
 				tok	=tok.TrimEnd(',');	//rid of comma if here
 
+				if(tok == "")
+				{
+					continue;
+				}
+
 				if(tok.StartsWith("reg"))
 				{
-					//register!
-					argIndicator	|=0x1;
-
-					//trim reg
-					tok	=tok.Substring(3);
-
-					byte	regAddr;
-					if(!byte.TryParse(tok, out regAddr))
-					{
-						return	false;
-					}
-					srcAddr	=regAddr;
-					break;
+					SetArgFlag(ref argIndicator, SrcRegister);
+					GetRegisterArg(tok, ref srcArg, lineNum);
 				}
 				else if(tok.StartsWith("["))
 				{
-					//pointer!
-					argIndicator	|=0x2;
-
-					//trim bracketses
-					tok	=tok.TrimStart('[');
-					tok	=tok.TrimEnd(']');
-
-					if(!UInt64.TryParse(tok, out srcAddr))
-					{
-						return	false;
-					}
-					break;
+					SetArgFlag(ref argIndicator, SrcAddress);
+					GetAddressArg(tok, ref srcArg, lineNum);
 				}
 				else
 				{
-					//label?
-					if(labels.Contains(tok))
+					//label or numerical constant?
+					if(char.IsDigit(tok[0]))
 					{
-						argIndicator	|=0x4;
+						SetArgFlag(ref argIndicator, SrcNumber);
+						GetNumericalArg(tok, ref srcArg, lineNum);
+					}
+					else if(labels.Contains(tok))
+					{
+						SetArgFlag(ref argIndicator, SrcLabel);
 
 						//the address might not be known yet
 						//so just put the index of the label
-						srcAddr	=(UInt64)labels.IndexOf(tok);
+						srcArg	=(UInt64)labels.IndexOf(tok);
 					}
 					else
 					{
 						//error of some sort?
+						mScreen.Print("Unknown token: " + tok + " at line: " + lineNum);
 						return	false;
 					}					
 				}
+				break;
 			}
 
 			if(numOperands == 1)
 			{
-				bool	ret	=exe.WriteByte(instruction);
-
-				ret	=exe.WriteByte(argIndicator);
-
-				if((argIndicator & 0x1) != 0)
-				{
-					exe.WriteByte((byte)srcAddr);	//register
-				}
-				else	//addr or label
-				{
-					if(exe.Is16Bit())
-					{
-						exe.WriteWord((UInt16)srcAddr);
-					}
-					else if(exe.Is32Bit())
-					{
-						exe.WriteDWord((UInt32)srcAddr);
-					}
-					else if(exe.Is64Bit())
-					{
-						exe.WriteQWord((UInt64)srcAddr);
-					}
-				}
-				return	ret;
+				ExeWrite(exe, lineNum, instruction, argIndicator, srcArg, 0);
+				return	true;
 			}
 
 			//dst
-			UInt64	dstAddr	=0;
-			for(;tokIdx < toks.Length;)
+			UInt64	dstArg	=0;
 			{
 				string	tok	=toks[tokIdx++].ToLowerInvariant();
 
@@ -328,101 +292,184 @@ namespace UserCodeLib
 
 				if(tok.StartsWith("reg"))
 				{
-					//register!
-					argIndicator	|=(0x1 << 4);
-
-					//trim reg
-					tok	=tok.Substring(3);
-
-					byte	regAddr;
-					if(!byte.TryParse(tok, out regAddr))
-					{
-						return	false;
-					}
-					dstAddr	=regAddr;
-					break;
+					SetArgFlag(ref argIndicator, DstRegister);
+					GetRegisterArg(tok, ref dstArg, lineNum);
 				}
 				else if(tok.StartsWith("["))
 				{
-					//pointer!
-					argIndicator	|=(0x2 << 4);
-
-					//trim bracketses
-					tok	=tok.TrimStart('[');
-					tok	=tok.TrimEnd(']');
-
-					if(!UInt64.TryParse(tok, out dstAddr))
-					{
-						return	false;
-					}
-					break;
+					SetArgFlag(ref argIndicator, DstAddress);
+					GetAddressArg(tok, ref dstArg, lineNum);
 				}
 				else
 				{
-					//some kind of wacky error?
-					return	false;
+					if(char.IsDigit(tok[0]))
+					{
+						SetArgFlag(ref argIndicator, DstNumber);
+						GetNumericalArg(tok, ref dstArg, lineNum);
+					}
+					else
+					{
+						mScreen.Print("Unknown token: " + tok + " at line: " + lineNum);
+						return	false;
+					}
 				}
 			}
 
-			exe.WriteByte(instruction);
-			exe.WriteByte(argIndicator);
+			ExeWrite(exe, lineNum, instruction, argIndicator, srcArg, dstArg);
 
-			//write src arg
-			if((argIndicator & 0x1) != 0)
+			return	true;
+		}
+
+
+		void SetArgFlag(ref byte arg, byte flag)
+		{
+			arg	|=flag;			
+		}
+
+		bool IsArgFlagSet(byte arg, byte flag)
+		{
+			return	((arg & flag) != 0);
+		}
+
+
+		bool GetRegisterArg(string tok, ref UInt64 srcArg, int lineNum)
+		{
+			//trim reg
+			tok	=tok.Substring(3);
+
+			byte	regAddr;
+			if(!byte.TryParse(tok, out regAddr))
 			{
-				exe.WriteByte((byte)srcAddr);	//register
-			}
-			else	//addr or label
-			{
-				if(exe.Is16Bit())
-				{
-					exe.WriteWord((UInt16)srcAddr);
-				}
-				else if(exe.Is32Bit())
-				{
-					exe.WriteDWord((UInt32)srcAddr);
-				}
-				else if(exe.Is64Bit())
-				{
-					exe.WriteQWord((UInt64)srcAddr);
-				}
+				mScreen.Print("Invalid register: " + tok + " at line: " + lineNum);
+				return	false;
 			}
 
-			//write dst arg
-			if((argIndicator & (0x1 << 4)) != 0)
+			srcArg	=regAddr;
+			return	true;
+		}
+
+		bool GetNumericalArg(string tok, ref UInt64 srcArg, int lineNum)
+		{
+			if(!UInt64.TryParse(tok, out srcArg))
 			{
-				exe.WriteByte((byte)dstAddr);	//register
-			}
-			else	//addr or label
-			{
-				if(exe.Is16Bit())
-				{
-					exe.WriteWord((UInt16)dstAddr);
-				}
-				else if(exe.Is32Bit())
-				{
-					exe.WriteDWord((UInt32)dstAddr);
-				}
-				else if(exe.Is64Bit())
-				{
-					exe.WriteQWord((UInt64)dstAddr);
-				}
+				mScreen.Print("Invalid numerical constant: " + tok + " at line: " + lineNum);
+				return	false;
 			}
 			return	true;
 		}
 
-		static UInt32 IndexOf(Dictionary<string, UInt64> labels, string tok)
+		bool GetAddressArg(string tok, ref UInt64 srcArg, int lineNum)
 		{
-			UInt32	idx	=0;
-			foreach(KeyValuePair<string, UInt64> leb in labels)
+			//trim bracketses
+			tok	=tok.TrimStart('[');
+			tok	=tok.TrimEnd(']');
+
+			if(!UInt64.TryParse(tok, out srcArg))
 			{
-				if(leb.Key == tok)
-				{
-					return	idx;
-				}
-				idx++;
+				mScreen.Print("Invalid address: " + tok + " at line: " + lineNum);
+				return	false;
 			}
-			return	0xFFFFFFFF;
+			return	true;
+		}
+
+		void ExeWrite(Ram exe, int lineNum, byte instruction, byte argIndicator, UInt64 src, UInt64 dst)
+		{
+			int	numOperands	=mNumOperands[instruction];
+
+			if(!exe.WriteByte(instruction))
+			{
+				mScreen.Print("Error writing to exe at line " + lineNum);
+				return;
+			}
+
+			if(numOperands == 0)
+			{
+				return;
+			}
+
+			if(!exe.WriteByte(argIndicator))
+			{
+				mScreen.Print("Error writing to exe at line " + lineNum);
+				return;
+			}
+
+			if(IsArgFlagSet(argIndicator, SrcRegister))
+			{
+				if(!exe.WriteByte((byte)src))	//register
+				{
+					mScreen.Print("Error writing to exe at line " + lineNum);
+				}
+			}
+			else	//addr or label
+			{
+				WriteExeValue(exe, src, lineNum);
+			}
+
+			if(numOperands <= 1)
+			{
+				return;
+			}
+
+			if(IsArgFlagSet(argIndicator, DstRegister))
+			{
+				exe.WriteByte((byte)dst);	//register
+			}
+			else	//addr or label
+			{
+				WriteExeValue(exe, dst, lineNum);
+			}
+		}
+
+		void WriteExeValue(Ram exe, UInt64 val, int lineNum)
+		{
+			if(exe.Is16Bit())
+			{
+				if(val > UInt16.MaxValue)
+				{
+					mScreen.Print("Warning:  Value: " + val + " too big to fit in 16 bits at line: " + lineNum);
+				}
+
+				if(!exe.WriteWord((UInt16)val))
+				{
+					mScreen.Print("Error writing to exe ram at line " + lineNum);
+				}
+			}
+			else if(exe.Is32Bit())
+			{
+				if(val > UInt16.MaxValue)
+				{
+					mScreen.Print("Warning:  Value: " + val + " too big to fit in 16 bits at line: " + lineNum);
+				}
+
+				if(!exe.WriteDWord((UInt32)val))
+				{
+					mScreen.Print("Error writing to exe ram at line " + lineNum);
+				}
+			}
+			else if(exe.Is64Bit())
+			{
+				if(!exe.WriteQWord((UInt64)val))
+				{
+					mScreen.Print("Error writing to exe ram at line " + lineNum);
+				}
+			}
+		}
+
+		UInt64	ReadExeValue(Ram exe)
+		{
+			if(exe.Is16Bit())
+			{
+				return	exe.ReadWord();
+			}
+			else if(exe.Is32Bit())
+			{
+				return	exe.ReadDWord();
+			}
+			else if(exe.Is64Bit())
+			{
+				return	exe.ReadQWord();
+			}
+			return	0;
 		}
 
 

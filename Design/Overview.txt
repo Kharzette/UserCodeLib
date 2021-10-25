@@ -33,3 +33,14 @@ Asm
 		CF	carry
 		ZF	zero
 		SF	sign
+	Labels
+		word with a : at the end
+		Can be used as a jmp target or for self modifying code
+	Addresses
+		put in [] brackets
+	Constants
+		Just specify a number I guess?
+	Variables
+		maybe eventually?
+	Functions
+		Someday

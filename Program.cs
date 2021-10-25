@@ -27,9 +27,11 @@ namespace UserCodeLib
 				Console.WriteLine("Couldn't open file " + args[0]);
 			}
 
+			Screen	scr	=new Screen(Screen.Modes.Text, 80, 80);
+
 			StreamReader	sr	=new StreamReader(fs);
 
-			Compiler	cmp	=new Compiler();
+			Compiler	cmp	=new Compiler(scr);
 
 			Ram	mem	=new Ram();
 
