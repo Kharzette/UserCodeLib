@@ -6,20 +6,31 @@ namespace UserCodeLib
 {
 	internal class Compiler
 	{
+		//language data
 		Dictionary<string, byte>	mInstructions	=new Dictionary<string, byte>();
 		Dictionary<byte, int>		mNumOperands	=new Dictionary<byte, int>();
+		Dictionary<string, byte>	mValidTypes		=new Dictionary<string, byte>();
+
+		//file data
+		List<string>	mLabels, mVars;
+		List<UInt64>	mLabelAddrs, mVarAddrs;
+
 
 		Screen	mScreen;
 
-		const UInt32	ExeMagic	=0xF00CF00D;	//exe marker
-		const byte		SrcRegister	=0x1;
-		const byte		SrcAddress	=0x2;
-		const byte		SrcLabel	=0x4;
-		const byte		SrcNumber	=0x8;
-		const byte		DstRegister	=0x1 << 4;
-		const byte		DstAddress	=0x2 << 4;
-		const byte		DstLabel	=0x4 << 4;
-		const byte		DstNumber	=0x8 << 4;
+		const UInt32	ExeMagic		=0xF00CF00D;	//exe marker
+		const byte		SrcRegister		=1;				//ex: mov reg00, reg01
+		const byte		SrcAddress		=2;				//ex: mov [69], reg00
+		const byte		SrcLabel		=3;				//ex: jmp label
+		const byte		SrcNumber		=4;				//ex: mov 7, reg00
+		const byte		SrcRegAddr		=5;				//ex: mov [reg00], reg01
+		const byte		SrcVariable		=6;				//ex: mov i, reg00
+		const byte		DstRegister		=SrcRegister << 4;
+		const byte		DstAddress		=SrcAddress << 4;
+		const byte		DstLabel		=SrcLabel << 4;
+		const byte		DstNumber		=SrcNumber << 4;
+		const byte		DstRegAddr		=SrcRegAddr << 4;
+		const byte		DstVariable		=SrcVariable << 4;
 
 
 		internal Compiler(Screen scr)
@@ -35,37 +46,16 @@ namespace UserCodeLib
 			//first write an exe magic
 			exe.WriteDWord(ExeMagic);
 
-			//label tracking
-			List<string>	labels		=new List<string>();
-			List<UInt64>	labelAddrs	=new List<UInt64>();
+			//prescan for labels / vars
+			GrabLabels(src);
+			GrabVars(src);
 
-			//prescan for labels
-			for(;;)
-			{
-				string	line	=src.ReadLine();
-
-				string	[]toks	=line.Split(' ');
-
-				if(toks[0].EndsWith(':'))
-				{
-					//label!
-					string	lab	=toks[0].TrimEnd(':');
-					labels.Add(lab);
-					labelAddrs.Add(0);	//don't know yet
-				}
-
-				if(src.EndOfStream)
-				{
-					break;
-				}
-			}
-
-			src.BaseStream.Seek(0, SeekOrigin.Begin);
+			//parse lines
 			for(int i=0;;i++)
 			{
 				string	line	=src.ReadLine();
 
-				if(!ParseLine(line, i, labels, labelAddrs, exe))
+				if(!ParseLine(line, i, exe))
 				{
 					return	false;
 				}
@@ -92,11 +82,11 @@ namespace UserCodeLib
 				}
 
 				byte	args	=exe.ReadByte();
-				if(IsArgFlagSet(args, SrcLabel))
+				if((args & 0xF) == SrcLabel)
 				{
 					//label
 					int	labelIndex	=(int)ReadExeValue(exe);
-					if(labelIndex < 0 || labelIndex > labels.Count)
+					if(labelIndex < 0 || labelIndex > mLabels.Count)
 					{
 						mScreen.Print("Invalid label index: " + labelIndex + " at line " + lineNum);
 						return	false;
@@ -108,17 +98,17 @@ namespace UserCodeLib
 					exe.SetPointer(pointer);
 
 					//write proper address
-					WriteExeValue(exe, labelAddrs[labelIndex], lineNum);
+					WriteExeValue(exe, mLabelAddrs[labelIndex], lineNum);
 				}
-				else if(IsArgFlagSet(args, SrcRegister))
+				else if((args & 0xF) == SrcRegister)
 				{
 					exe.ReadByte();
 				}
-				else if(IsArgFlagSet(args, SrcAddress))
+				else if((args & 0xF) == SrcAddress)
 				{
 					ReadExeValue(exe);
 				}
-				else if(IsArgFlagSet(args, SrcNumber))
+				else if((args & 0xF) == SrcNumber)
 				{
 					ReadExeValue(exe);
 				}
@@ -129,16 +119,16 @@ namespace UserCodeLib
 					continue;
 				}
 
-				if(IsArgFlagSet(args, DstRegister))
+				if((args >> 4) == DstRegister)
 				{
 					//register dst
 					exe.ReadByte();
 				}
-				else if(IsArgFlagSet(args, DstLabel))
+				else if((args >> 4) == DstLabel)
 				{
 					//label
 					int	labelIndex	=(int)ReadExeValue(exe);
-					if(labelIndex < 0 || labelIndex > labels.Count)
+					if(labelIndex < 0 || labelIndex > mLabels.Count)
 					{
 						mScreen.Print("Invalid label index: " + labelIndex + " at line " + lineNum);
 						return	false;
@@ -150,7 +140,7 @@ namespace UserCodeLib
 					exe.SetPointer(pointer);
 
 					//write proper address
-					WriteExeValue(exe, labelAddrs[labelIndex], lineNum);
+					WriteExeValue(exe, mLabelAddrs[labelIndex], lineNum);
 				}
 				else
 				{
@@ -169,8 +159,6 @@ namespace UserCodeLib
 
 		bool ParseLine(string		codeLine,
 					   int			lineNum,
-					   List<string>	labels,
-					   List<UInt64>	labelAddrs,
 					   Ram			exe)
 		{
 			codeLine	=codeLine.Trim();
@@ -188,15 +176,15 @@ namespace UserCodeLib
 				//label
 				string	lab	=toks[0].TrimEnd(':');
 
-				int	labIdx	=labels.IndexOf(lab);
-				if(labIdx < 0 || labIdx >= labels.Count)
+				int	labIdx	=mLabels.IndexOf(lab);
+				if(labIdx < 0 || labIdx >= mLabels.Count)
 				{
 					//some error
 					mScreen.Print("Label: " + lab + " not found on line: " + lineNum);
 					return	false;
 				}
 
-				labelAddrs[labIdx]	=exe.GetPointer();
+				mLabelAddrs[labIdx]	=exe.GetPointer();
 
 				return	true;
 			}
@@ -221,59 +209,35 @@ namespace UserCodeLib
 			//the second byte in a line's exe stream is an indicator
 			//of where the arguments are:
 			//The first four bits for src, last four for dst
-			//0 none, 1 register, 2 ram address, 4 label address, 8 numerical constant
+			//0 none, 1 register, 2 ram address, 3 label address,
+			//4 numerical constant, 5 address in register, 6 variable,
 			//I think x86 crams this into the first byte
 			byte	argIndicator	=0;
 
 			//src
 			int		tokIdx	=1;
 			UInt64	srcArg	=0;
-			for(;;)
+			for(;tokIdx < toks.Length;tokIdx++)
 			{
-				string	tok	=toks[tokIdx++].ToLowerInvariant();
+				string	tok	=toks[tokIdx].ToLowerInvariant();
 
-				tok	=tok.Trim();
-				tok	=tok.TrimEnd(',');	//rid of comma if here
+				byte	result	=ParseArgToken(tok, ref argIndicator,
+											   ref srcArg, lineNum);
 
-				if(tok == "")
+				if(result == 2)
 				{
-					continue;
+					return	false;
 				}
+				else if(result == 1)
+				{
+					break;
+				}
+			}
 
-				if(tok.StartsWith("reg"))
-				{
-					SetArgFlag(ref argIndicator, SrcRegister);
-					GetRegisterArg(tok, ref srcArg, lineNum);
-				}
-				else if(tok.StartsWith("["))
-				{
-					SetArgFlag(ref argIndicator, SrcAddress);
-					GetAddressArg(tok, ref srcArg, lineNum);
-				}
-				else
-				{
-					//label or numerical constant?
-					if(char.IsDigit(tok[0]))
-					{
-						SetArgFlag(ref argIndicator, SrcNumber);
-						GetNumericalArg(tok, ref srcArg, lineNum);
-					}
-					else if(labels.Contains(tok))
-					{
-						SetArgFlag(ref argIndicator, SrcLabel);
-
-						//the address might not be known yet
-						//so just put the index of the label
-						srcArg	=(UInt64)labels.IndexOf(tok);
-					}
-					else
-					{
-						//error of some sort?
-						mScreen.Print("Unknown token: " + tok + " at line: " + lineNum);
-						return	false;
-					}					
-				}
-				break;
+			if(tokIdx >= toks.Length)
+			{
+				mScreen.Print("Not enough arguments for instruction: " + lowerTok + " at line: " + lineNum);
+				return	false;
 			}
 
 			if(numOperands == 1)
@@ -284,34 +248,22 @@ namespace UserCodeLib
 
 			//dst
 			UInt64	dstArg	=0;
+			byte	dstInd	=0;
+			for(;tokIdx < toks.Length;tokIdx++)
 			{
 				string	tok	=toks[tokIdx++].ToLowerInvariant();
 
-				tok	=tok.Trim();
-				tok	=tok.TrimStart(',');	//rid of comma if here
-
-				if(tok.StartsWith("reg"))
+				byte	result	=ParseArgToken(tok, ref dstInd,
+											   ref srcArg, lineNum);
+				if(result == 2)
 				{
-					SetArgFlag(ref argIndicator, DstRegister);
-					GetRegisterArg(tok, ref dstArg, lineNum);
+					return	false;
 				}
-				else if(tok.StartsWith("["))
+				else if(result == 1)
 				{
-					SetArgFlag(ref argIndicator, DstAddress);
-					GetAddressArg(tok, ref dstArg, lineNum);
-				}
-				else
-				{
-					if(char.IsDigit(tok[0]))
-					{
-						SetArgFlag(ref argIndicator, DstNumber);
-						GetNumericalArg(tok, ref dstArg, lineNum);
-					}
-					else
-					{
-						mScreen.Print("Unknown token: " + tok + " at line: " + lineNum);
-						return	false;
-					}
+					dstInd 			<<=4;
+					argIndicator	|=dstInd;
+					break;
 				}
 			}
 
@@ -320,15 +272,204 @@ namespace UserCodeLib
 			return	true;
 		}
 
-
-		void SetArgFlag(ref byte arg, byte flag)
+		//return 1 if grabbed arg, 0 if didn't, 2 if error
+		byte ParseArgToken(string tok, ref byte argIndicator, ref UInt64 arg, int lineNum)
 		{
-			arg	|=flag;			
+			tok	=tok.Trim();
+			tok	=tok.Trim(',');	//rid of comma if here
+
+			if(tok == "")
+			{
+				return	0;
+			}
+
+			if(tok.StartsWith("reg"))
+			{
+				argIndicator	=SrcRegister;
+				GetRegisterArg(tok, ref arg, lineNum);
+			}
+			else if(tok.StartsWith("["))
+			{
+				string	pointerTok	=tok.Trim('[', ']');
+				if(char.IsDigit(pointerTok[0]))
+				{
+					argIndicator	=SrcAddress;
+					GetAddressArg(tok, ref arg, lineNum);
+				}
+				else if(pointerTok.StartsWith("reg"))
+				{
+					argIndicator	=SrcRegAddr;
+					GetRegisterArg(pointerTok, ref arg, lineNum);
+				}
+				else
+				{
+					mScreen.Print("Syntax error on line: " + lineNum);
+					return	2;
+				}
+			}
+			else
+			{
+				//label or numerical constant?
+				if(char.IsDigit(tok[0]))
+				{
+					argIndicator	=SrcNumber;
+					GetNumericalArg(tok, ref arg, lineNum);
+				}
+				else if(mLabels.Contains(tok))
+				{
+					argIndicator	=SrcLabel;
+
+					//the address might not be known yet
+					//so just put the index of the label
+					arg	=(UInt64)mLabels.IndexOf(tok);
+				}
+				else if(mVars.Contains(tok))
+				{
+					argIndicator	=SrcVariable;
+					arg				=mVarAddrs[mVars.IndexOf(tok)];
+				}
+				else
+				{
+					//error of some sort?
+					mScreen.Print("Unknown token: " + tok + " at line: " + lineNum);
+					return	2;
+				}					
+			}
+			return	1;
 		}
 
-		bool IsArgFlagSet(byte arg, byte flag)
+		//prescan for labels
+		void GrabLabels(StreamReader src)
 		{
-			return	((arg & flag) != 0);
+			mLabels		=new List<string>();
+			mLabelAddrs	=new List<UInt64>();
+
+			for(;;)
+			{
+				string	line	=src.ReadLine();
+
+				string	[]toks	=line.Split(' ');
+
+				if(toks[0].EndsWith(':'))
+				{
+					//label!
+					string	lab	=toks[0].TrimEnd(':');
+
+					if(!mLabels.Contains(lab))
+					{
+						if(IsValidVariable(lab))
+						{
+							mLabels.Add(lab);
+							mLabelAddrs.Add(0);	//don't know yet
+						}
+					}
+				}
+
+				if(src.EndOfStream)
+				{
+					break;
+				}
+			}
+
+			src.BaseStream.Seek(0, SeekOrigin.Begin);
+		}
+
+		//prescan for variables
+		void GrabVars(StreamReader src)
+		{
+			mVars		=new List<string>();
+			mVarAddrs	=new List<UInt64>();
+
+			//this will adjust after code maybe?
+			UInt64	varAddress	=0;
+
+			for(;;)
+			{
+				string	line	=src.ReadLine();
+
+				string	[]toks	=line.Split(' ', '\t', ',');
+
+				string	tokLow	=toks[0].ToLowerInvariant();
+
+				if(mValidTypes.ContainsKey(tokLow))
+				{
+					//Variable!
+					foreach(string tok in toks)
+					{
+						if(tok == "")
+						{
+							continue;
+						}
+
+						if(!IsValidVariable(tok))
+						{
+							continue;
+						}
+
+						mVars.Add(tok);
+						mVarAddrs.Add(varAddress);
+
+						varAddress	+=mValidTypes[tokLow];
+					}
+				}
+
+				if(src.EndOfStream)
+				{
+					break;
+				}
+			}
+
+			src.BaseStream.Seek(0, SeekOrigin.Begin);
+		}
+
+		bool IsValidVariable(string varText)
+		{
+			//must begin with a letter
+			if(!char.IsLetter(varText[0]))
+			{
+				return	false;
+			}
+
+			//make sure it isn't a type
+			if(mValidTypes.ContainsKey(varText))
+			{
+				return	false;
+			}
+
+			//check for invalid characters
+			foreach(char c in varText)
+			{
+				//symbols & other strange stuff under the numbers
+				if(c < 48)
+				{
+					return	false;
+				}
+
+				//junk between numbers and letters (< > etc)
+				if(c > 57 && c < 65)
+				{
+					return	false;
+				}
+
+				//[]\^
+				if(c > 90 && c < 95)
+				{
+					return	false;
+				}
+
+				//`
+				if(c == 96)
+				{
+					return	false;
+				}
+
+				//after z
+				if(c > 122)
+				{
+					return	false;
+				}
+			}
+			return	true;
 		}
 
 
@@ -393,7 +534,7 @@ namespace UserCodeLib
 				return;
 			}
 
-			if(IsArgFlagSet(argIndicator, SrcRegister))
+			if((argIndicator & 0xF) == SrcRegister)
 			{
 				if(!exe.WriteByte((byte)src))	//register
 				{
@@ -410,7 +551,7 @@ namespace UserCodeLib
 				return;
 			}
 
-			if(IsArgFlagSet(argIndicator, DstRegister))
+			if((argIndicator >> 4) == DstRegister)
 			{
 				exe.WriteByte((byte)dst);	//register
 			}
@@ -475,6 +616,10 @@ namespace UserCodeLib
 
 		void Init()
 		{
+			mValidTypes.Add("byte", 1);
+			mValidTypes.Add("int16", 2);
+			mValidTypes.Add("uint16", 2);
+
 			//mov src, dst
 			mInstructions.Add("mov", 0x00);
 			mNumOperands.Add(0x00, 2);

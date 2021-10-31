@@ -6,3 +6,4 @@ x	Numerical constants as arguments
 	Filesystem
 	Text editor
 	Convert register mnemonic to a numerical address via the register module
+	Need a way to map multiple devices / memory chunks into asm address space
