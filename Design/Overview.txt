@@ -6,6 +6,7 @@ Goals
 Asm
 	Instructions
 		mov		src, dst
+		addrOf	var, dst	//store address of variable var in dst
 		add		src, dst
 		mul		src, dst
 		inc		dst
