@@ -19,6 +19,7 @@ namespace UserCodeLib
 		Screen	mScreen;
 
 		const UInt32	ExeMagic		=0xF00CF00D;	//exe marker
+		const UInt32	StartVarAddr	=8;				//first address for variables
 		const byte		SrcRegister		=1;				//ex: mov reg00, reg01
 		const byte		SrcPointer		=2;				//ex: mov [69], reg00
 		const byte		SrcLabel		=3;				//ex: jmp label
@@ -50,8 +51,8 @@ namespace UserCodeLib
 			GrabLabels(src);
 			GrabVars(src);
 
-			//save space for variables
-			exe.SetPointer(4 + (UInt32)mVars.Count * 2);
+			//skip exe dword
+			exe.SetPointer(4);
 
 			//parse lines
 			for(int i=0;;i++)
@@ -69,19 +70,21 @@ namespace UserCodeLib
 				}
 			}
 
+			//the addresses of labels will be known now
+			return	ReplaceLabelAddrs(exe);
+		}
+
+
+		bool ReplaceLabelAddrs(Ram exe)
+		{
 			UInt64	endExe	=exe.GetPointer();
 
 			//buzz through compiled code and fix labels
-			//skip exe number and variable space
-			exe.SetPointer(4 + (UInt32)mVars.Count * 2);
+			//skip exe number
+			exe.SetPointer(4);
 
 			for(int lineNum=0;;lineNum++)
 			{
-				if(lineNum == 3)
-				{
-					int	j=69;
-					j++;
-				}
 				byte	instruction	=exe.ReadByte();
 
 				int	numArgs	=mNumOperands[instruction];
@@ -159,12 +162,14 @@ namespace UserCodeLib
 					break;
 				}
 			}
+			
 			return	true;
 		}
 
-		bool ParseLine(string		codeLine,
-					   int			lineNum,
-					   Ram			exe)
+
+		bool ParseLine(string	codeLine,
+					   int		lineNum,
+					   Ram		exe)
 		{
 			codeLine	=codeLine.Trim();
 
@@ -398,7 +403,7 @@ namespace UserCodeLib
 			mVarAddrs	=new List<UInt64>();
 
 			//skip exe magic number
-			UInt64	varAddress	=4;
+			UInt64	varAddress	=StartVarAddr;
 
 			for(;;)
 			{
