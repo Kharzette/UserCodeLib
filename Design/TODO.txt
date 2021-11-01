@@ -1,9 +1,13 @@
 x	Proper error reporting with line numbers
 x	Numerical constants as arguments
-	Variables
+x	Variables
 	Functions
 	Writable screen device memory
 	Filesystem
 	Text editor
 	Convert register mnemonic to a numerical address via the register module
-	Need a way to map multiple devices / memory chunks into asm address space
+x	Need a way to map multiple devices / memory chunks into asm address space
+	Write in size of exe in exe
+	Param to the compiler to determine size of data page (Pragma?)
+	string type
+	byte type
