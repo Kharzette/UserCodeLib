@@ -9,14 +9,16 @@ namespace UserCodeLib
 		UInt64	[]m64Regs;
 
 
-		const int	MaxRegs	=32;
+		const int	MaxRegs64	=32;
+		const int	MaxRegs32	=24;
+		const int	MaxRegs16	=12;
 
 
 		internal void Init(int num16, int num32, int num64)
 		{
-			num16	=Math.Clamp(num16, 0, MaxRegs);
-			num32	=Math.Clamp(num32, 0, MaxRegs);
-			num64	=Math.Clamp(num64, 0, MaxRegs);
+			num16	=Math.Clamp(num16, 0, MaxRegs16);
+			num32	=Math.Clamp(num32, 0, MaxRegs32);
+			num64	=Math.Clamp(num64, 0, MaxRegs64);
 
 			m16Regs	=new UInt16[num16];
 			m32Regs	=new UInt32[num32];

@@ -33,9 +33,11 @@ namespace UserCodeLib
 
 			Compiler	cmp	=new Compiler(scr);
 
-			Ram	mem	=new Ram();
+			OS	os	=new OS(0);
 
-			mem.Init(8192, 0);	//8K 16 bit
+			Ram	mem;
+			os.Alloc(8192, AddressSpace.SpaceTypes.Code,
+						"Test program ram", out mem);
 
 			cmp.Compile(sr, mem);
         }

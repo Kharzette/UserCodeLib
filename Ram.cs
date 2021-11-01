@@ -5,15 +5,17 @@ namespace UserCodeLib
 	internal class Ram
 	{
 		byte	[]mChonk;
+		UInt16	mPage;
 		UInt64	mSize;
 		UInt64	mCur;	//pointer to current spot in ram
 
 		byte	mAddressing;	//0 is 16bit, 1 is 32bit, 2 is 64bit
 
 
-		internal void Init(UInt64 size, byte addressing)
+		internal void Init(UInt64 size, byte addressing, UInt16 page)
 		{
 			mSize	=size;
+			mPage	=page;
 
 			mChonk	=new byte[size];
 

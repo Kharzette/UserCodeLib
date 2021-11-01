@@ -30,6 +30,7 @@ Asm
 		cmovge	src, dst	//mov if greater than or equal
 		cmovl	src, dst	//mov if less than
 		cmovle	src, dst	//mov if less than or equal
+		call	src, dst	//function call to address in src, pagenum in dst
 	Flags
 		CF	carry
 		ZF	zero
