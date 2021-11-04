@@ -10,7 +10,7 @@ namespace UserCodeLib
 	{
 		internal enum SpaceTypes
 		{
-			Device, Code, Ram
+			Device, Code, Data
 		};
 
 		class Page

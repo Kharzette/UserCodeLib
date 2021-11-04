@@ -40,6 +40,13 @@ namespace UserCodeLib
 						"Test program ram", out mem);
 
 			cmp.Compile(sr, mem);
+
+			sr.Close();
+			fs.Close();
+
+			CPU	cpu	=new CPU(os);
+
+			cpu.RunCode(mem);
         }
     }
 }

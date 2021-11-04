@@ -1,13 +1,25 @@
 x	Proper error reporting with line numbers
 x	Numerical constants as arguments
 x	Variables
+	need more clarity in execution args
+		address / value
 	Functions
 	Writable screen device memory
 	Filesystem
 	Text editor
 	Convert register mnemonic to a numerical address via the register module
 x	Need a way to map multiple devices / memory chunks into asm address space
-	Write in size of exe in exe
-	Param to the compiler to determine size of data page (Pragma?)
+x	Write in size of exe in exe
+x	Param to the compiler to determine size of data page (Pragma?)
 	string type
 	byte type
+	OS routines
+		Filesystem stuff
+			List files in directory
+			Change directory
+			Make directory
+			Make new file
+			Open/close file
+		List available functions?
+		List available devices
+		Alloc memory pages

@@ -14,12 +14,13 @@ namespace UserCodeLib
 		//file data
 		List<string>	mLabels, mVars;
 		List<UInt64>	mLabelAddrs, mVarAddrs;
-
+		UInt64			mDataPageSize;
 
 		Screen	mScreen;
 
 		const UInt32	ExeMagic		=0xF00CF00D;	//exe marker
 		const UInt32	StartVarAddr	=8;				//first address for variables
+		const UInt64	DefaultDataPage	=1024;			//1k default data page
 		const byte		SrcRegister		=1;				//ex: mov reg00, reg01
 		const byte		SrcPointer		=2;				//ex: mov [69], reg00
 		const byte		SrcLabel		=3;				//ex: jmp label
@@ -36,7 +37,8 @@ namespace UserCodeLib
 
 		internal Compiler(Screen scr)
 		{
-			mScreen	=scr;
+			mScreen			=scr;
+			mDataPageSize	=DefaultDataPage;
 
 			Init();
 		}
@@ -51,8 +53,8 @@ namespace UserCodeLib
 			GrabLabels(src);
 			GrabVars(src);
 
-			//skip exe dword
-			exe.SetPointer(4);
+			//skip exe dword, size qword, data size qword
+			exe.SetPointer(4 + 8 + 8);
 
 			//parse lines
 			for(int i=0;;i++)
@@ -70,6 +72,16 @@ namespace UserCodeLib
 				}
 			}
 
+			UInt64	endExe	=exe.GetPointer();
+
+			exe.SetPointer(4);
+
+			//write the size of the code after the exe magic
+			exe.WriteQWord(endExe);
+
+			//write size of data page
+			exe.WriteQWord(mDataPageSize);
+
 			//the addresses of labels will be known now
 			return	ReplaceLabelAddrs(exe);
 		}
@@ -80,8 +92,8 @@ namespace UserCodeLib
 			UInt64	endExe	=exe.GetPointer();
 
 			//buzz through compiled code and fix labels
-			//skip exe number
-			exe.SetPointer(4);
+			//skip exe number, size qword, and data size qword
+			exe.SetPointer(4 + 8 + 8);
 
 			for(int lineNum=0;;lineNum++)
 			{
@@ -162,7 +174,7 @@ namespace UserCodeLib
 					break;
 				}
 			}
-			
+
 			return	true;
 		}
 
@@ -206,6 +218,12 @@ namespace UserCodeLib
 
 			byte	instruction	=0;
 			string	lowerTok	=toks[0].ToLowerInvariant();
+
+			if(lowerTok.StartsWith("#pragma"))
+			{
+				//pragmastuff
+				return	ParsePragma(toks);
+			}
 
 			//see if this is a variable declaration line
 			if(mValidTypes.ContainsKey(lowerTok))
@@ -276,7 +294,7 @@ namespace UserCodeLib
 				string	tok	=toks[tokIdx++].ToLowerInvariant();
 
 				byte	result	=ParseArgToken(tok, ref dstInd,
-											   ref srcArg, lineNum);
+											   ref dstArg, lineNum);
 				if(result == 2)
 				{
 					return	false;
@@ -635,6 +653,40 @@ namespace UserCodeLib
 				return	exe.ReadQWord();
 			}
 			return	0;
+		}
+
+
+		bool	ParsePragma(string	[]toks)
+		{
+			//get pragma arg
+			string	arg		="";
+			UInt64	numArg	=0;
+			for(int i=1;i < toks.Length;i++)
+			{
+				if(toks[i] == "")
+				{
+					continue;
+				}
+
+				string	tok	=toks[i].ToLowerInvariant();
+
+				if(char.IsNumber(tok[0]))
+				{
+					UInt64.TryParse(tok, out numArg);
+					break;
+				}
+				else
+				{
+					arg	=tok;
+				}
+			}
+
+			if(arg == "datapagesize")
+			{
+				mDataPageSize	=numArg;
+			}
+
+			return	true;
 		}
 
 

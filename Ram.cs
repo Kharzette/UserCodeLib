@@ -78,7 +78,7 @@ namespace UserCodeLib
 		{
 			UInt16	ret	=mChonk[mCur++];
 
-			ret	>>=8;
+			ret	<<=8;
 			ret	|=mChonk[mCur++];
 
 			return	ret;
@@ -86,10 +86,10 @@ namespace UserCodeLib
 
 		internal UInt32 ReadDWord()
 		{
-			UInt32	ret	=(UInt32)(mChonk[mCur++] >> 24);
+			UInt32	ret	=(UInt32)(mChonk[mCur++] << 24);
 			
-			ret	|=(UInt32)(mChonk[mCur++] >> 16);
-			ret	|=(UInt32)(mChonk[mCur++] >> 8);
+			ret	|=(UInt32)(mChonk[mCur++] << 16);
+			ret	|=(UInt32)(mChonk[mCur++] << 8);
 			ret	|=(UInt32)(mChonk[mCur++]);
 
 			return	ret;
@@ -97,14 +97,14 @@ namespace UserCodeLib
 
 		internal UInt64 ReadQWord()
 		{
-			UInt64	ret	=(((UInt64)mChonk[mCur++]) >> 56);
+			UInt64	ret	=(((UInt64)mChonk[mCur++]) << 56);
 			
-			ret	|=(((UInt64)mChonk[mCur++]) >> 48);
-			ret	|=(((UInt64)mChonk[mCur++]) >> 40);
-			ret	|=(((UInt64)mChonk[mCur++]) >> 32);
-			ret	|=(((UInt64)mChonk[mCur++]) >> 24);
-			ret	|=(((UInt64)mChonk[mCur++]) >> 16);
-			ret	|=(((UInt64)mChonk[mCur++]) >> 8);
+			ret	|=(((UInt64)mChonk[mCur++]) << 48);
+			ret	|=(((UInt64)mChonk[mCur++]) << 40);
+			ret	|=(((UInt64)mChonk[mCur++]) << 32);
+			ret	|=(((UInt64)mChonk[mCur++]) << 24);
+			ret	|=(((UInt64)mChonk[mCur++]) << 16);
+			ret	|=(((UInt64)mChonk[mCur++]) << 8);
 			ret	|=mChonk[mCur++];
 
 			return	ret;
@@ -130,7 +130,7 @@ namespace UserCodeLib
 				return	false;
 			}
 
-			mChonk[mCur++]	=(byte)(val << 8);
+			mChonk[mCur++]	=(byte)(val >> 8);
 			mChonk[mCur++]	=(byte)(val & 0xFF);
 
 			return	true;
@@ -143,9 +143,9 @@ namespace UserCodeLib
 				return	false;
 			}
 
-			mChonk[mCur++]	=(byte)((val << 24) & 0xFF);
-			mChonk[mCur++]	=(byte)((val << 16) & 0xFF);
-			mChonk[mCur++]	=(byte)((val << 8) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 24) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 16) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 8) & 0xFF);
 			mChonk[mCur++]	=(byte)(val & 0xFF);
 
 			return	true;
@@ -158,13 +158,13 @@ namespace UserCodeLib
 				return	false;
 			}
 
-			mChonk[mCur++]	=(byte)((val << 56) & 0xFF);
-			mChonk[mCur++]	=(byte)((val << 48) & 0xFF);
-			mChonk[mCur++]	=(byte)((val << 40) & 0xFF);
-			mChonk[mCur++]	=(byte)((val << 32) & 0xFF);
-			mChonk[mCur++]	=(byte)((val << 24) & 0xFF);
-			mChonk[mCur++]	=(byte)((val << 16) & 0xFF);
-			mChonk[mCur++]	=(byte)((val << 8) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 56) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 48) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 40) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 32) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 24) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 16) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 8) & 0xFF);
 			mChonk[mCur++]	=(byte)(val & 0xFF);
 
 			return	true;
