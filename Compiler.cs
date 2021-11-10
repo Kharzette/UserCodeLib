@@ -13,26 +13,26 @@ namespace UserCodeLib
 
 		//file data
 		List<string>	mLabels, mVars;
-		List<UInt64>	mLabelAddrs, mVarAddrs;
+		List<UInt16>	mLabelAddrs, mVarAddrs;
 		UInt64			mDataPageSize;
 
 		Screen	mScreen;
 
 		const UInt32	ExeMagic		=0xF00CF00D;	//exe marker
-		const UInt32	StartVarAddr	=8;				//first address for variables
+		const UInt16	StartVarAddr	=8;				//first address for variables
 		const UInt64	DefaultDataPage	=1024;			//1k default data page
-		const byte		SrcRegister		=1;				//ex: mov reg00, reg01
-		const byte		SrcPointer		=2;				//ex: mov [69], reg00
-		const byte		SrcLabel		=3;				//ex: jmp label
-		const byte		SrcNumber		=4;				//ex: mov 7, reg00
-		const byte		SrcRegPointer	=5;				//ex: mov [reg00], reg01
-		const byte		SrcVariable		=6;				//ex: mov i, reg00 Converts to SrcPointer after compile
-		const byte		DstRegister		=SrcRegister << 4;
-		const byte		DstPointer		=SrcPointer << 4;
-		const byte		DstLabel		=SrcLabel << 4;
-		const byte		DstNumber		=SrcNumber << 4;
-		const byte		DstRegPointer	=SrcRegPointer << 4;
-		const byte		DstVariable		=SrcVariable << 4;
+		const byte		DstRegister		=1;				//ex: mov reg00, something
+		const byte		DstPointer		=2;				//ex: mov [69], reg00
+		const byte		DstLabel		=3;				//ex: jmp label
+		const byte		DstNumber		=4;				//ex: cmp 4, 5
+		const byte		DstRegPointer	=5;				//ex: mov [reg00], 69
+		const byte		DstVariable		=6;				//ex: mov i, reg00
+		const byte		SrcRegister		=DstRegister << 4;		//ex: mov reg00, reg01
+		const byte		SrcPointer		=DstPointer << 4;		//ex: mov reg00, [69]
+		const byte		SrcLabel		=DstLabel << 4;			//ex: mov reg00, label
+		const byte		SrcNumber		=DstNumber << 4;		//ex: mov reg00, 7
+		const byte		SrcRegPointer	=DstRegPointer << 4;	//ex: mov reg00, [reg01]
+		const byte		SrcVariable		=DstVariable << 4;		//ex: mov reg00, i
 
 
 		internal Compiler(Screen scr)
@@ -44,14 +44,14 @@ namespace UserCodeLib
 		}
 
 
-		internal bool	Compile(StreamReader src, Ram exe)
+		internal bool	Compile(StreamReader code, Ram exe)
 		{
 			//first write an exe magic
 			exe.WriteDWord(ExeMagic);
 
 			//prescan for labels / vars
-			GrabLabels(src);
-			GrabVars(src);
+			GrabLabels(code);
+			GrabVars(code);
 
 			//skip exe dword, size qword, data size qword
 			exe.SetPointer(4 + 8 + 8);
@@ -59,14 +59,14 @@ namespace UserCodeLib
 			//parse lines
 			for(int i=0;;i++)
 			{
-				string	line	=src.ReadLine();
+				string	line	=code.ReadLine();
 
 				if(!ParseLine(line, i, exe))
 				{
 					return	false;
 				}
 
-				if(src.EndOfStream)
+				if(code.EndOfStream)
 				{
 					break;
 				}
@@ -106,10 +106,11 @@ namespace UserCodeLib
 				}
 
 				byte	args	=exe.ReadByte();
-				if((args & 0xF) == SrcLabel)
+				if((args & 0xF) == DstLabel)
 				{
 					//label
-					int	labelIndex	=(int)ReadExeValue(exe);
+//					int	labelIndex	=(int)ReadExeValue(exe);
+					int	labelIndex	=(int)exe.ReadWord();
 					if(labelIndex < 0 || labelIndex > mLabels.Count)
 					{
 						mScreen.Print("Invalid label index: " + labelIndex + " at line " + lineNum);
@@ -122,15 +123,17 @@ namespace UserCodeLib
 					exe.SetPointer(pointer);
 
 					//write proper address
-					WriteExeValue(exe, mLabelAddrs[labelIndex], lineNum);
+					//WriteExeValue(exe, mLabelAddrs[labelIndex], lineNum);
+					exe.WriteWord((UInt16)mLabelAddrs[labelIndex]);
 				}
-				else if((args & 0xF) == SrcRegister || (args & 0xF) == SrcRegPointer)
+				else if((args & 0xF) == DstRegister || (args & 0xF) == DstRegPointer)
 				{
 					exe.ReadByte();
 				}
 				else
 				{
-					ReadExeValue(exe);
+					//ReadExeValue(exe);
+					exe.ReadWord();
 				}
 
 				//one more argument?
@@ -139,15 +142,16 @@ namespace UserCodeLib
 					continue;
 				}
 
-				if((args & 0xF0) == DstRegister || (args & 0xF0) == DstRegPointer)
+				if((args & 0xF0) == SrcRegister || (args & 0xF0) == SrcRegPointer)
 				{
-					//register dst
+					//register src
 					exe.ReadByte();
 				}
-				else if((args & 0xF0) == DstLabel)
+				else if((args & 0xF0) == SrcLabel)
 				{
 					//label
-					int	labelIndex	=(int)ReadExeValue(exe);
+//					int	labelIndex	=(int)ReadExeValue(exe);
+					int	labelIndex	=(int)exe.ReadWord();
 					if(labelIndex < 0 || labelIndex > mLabels.Count)
 					{
 						mScreen.Print("Invalid label index: " + labelIndex + " at line " + lineNum);
@@ -160,12 +164,19 @@ namespace UserCodeLib
 					exe.SetPointer(pointer);
 
 					//write proper address
-					WriteExeValue(exe, mLabelAddrs[labelIndex], lineNum);
+					//WriteExeValue(exe, mLabelAddrs[labelIndex], lineNum);
+					exe.WriteWord((UInt16)mLabelAddrs[labelIndex]);
 				}
 				else
 				{
 					//pointer or number
-					ReadExeValue(exe);
+//					ReadExeValue(exe);
+					exe.ReadWord();
+				}
+
+				if(numArgs == 2)
+				{
+					exe.ReadByte();
 				}
 
 				UInt64	curPos	=exe.GetPointer();
@@ -211,7 +222,7 @@ namespace UserCodeLib
 					return	false;
 				}
 
-				mLabelAddrs[labIdx]	=exe.GetPointer();
+				mLabelAddrs[labIdx]	=(UInt16)exe.GetPointer();
 
 				return	true;
 			}
@@ -248,72 +259,47 @@ namespace UserCodeLib
 
 			//the second byte in a line's exe stream is an indicator
 			//of where the arguments are:
-			//The first four bits for src, last four for dst
+			//The first four bits for dst, last four for src
 			//0 none, 1 register, 2 ram address, 3 label address,
 			//4 numerical constant, 5 address in register, 6 variable,
 			//I think x86 crams this into the first byte
-			byte	argIndicator	=0;
+			byte	[]argInd		=new byte[3];
+			int		tokIdx			=1;
+			UInt16	[]args			=new UInt16[3];
 
-			//src
-			int		tokIdx	=1;
-			UInt64	srcArg	=0;
-			for(;tokIdx < toks.Length;)
+			for(int i=0;i < numOperands;i++)
 			{
-				string	tok	=toks[tokIdx++].ToLowerInvariant();
-
-				byte	result	=ParseArgToken(tok, ref argIndicator,
-											   ref srcArg, lineNum);
-
-				if(result == 2)
+				for(;tokIdx < toks.Length;)
 				{
+					string	tok	=toks[tokIdx++].ToLowerInvariant();
+
+					byte	result	=ParseArgToken(tok, ref argInd[i],
+												ref args[i], lineNum);
+
+					if(result == 2)
+					{
+						return	false;
+					}
+					else if(result == 1)
+					{
+						break;
+					}
+				}
+
+				if(tokIdx > toks.Length)
+				{
+					mScreen.Print("Not enough arguments for instruction: " + lowerTok + " at line: " + lineNum);
 					return	false;
 				}
-				else if(result == 1)
-				{
-					break;
-				}
 			}
 
-			if(tokIdx > toks.Length)
-			{
-				mScreen.Print("Not enough arguments for instruction: " + lowerTok + " at line: " + lineNum);
-				return	false;
-			}
-
-			if(numOperands == 1)
-			{
-				ExeWrite(exe, lineNum, instruction, argIndicator, srcArg, 0);
-				return	true;
-			}
-
-			//dst
-			UInt64	dstArg	=0;
-			byte	dstInd	=0;
-			for(;tokIdx < toks.Length;)
-			{
-				string	tok	=toks[tokIdx++].ToLowerInvariant();
-
-				byte	result	=ParseArgToken(tok, ref dstInd,
-											   ref dstArg, lineNum);
-				if(result == 2)
-				{
-					return	false;
-				}
-				else if(result == 1)
-				{
-					dstInd 			<<=4;
-					argIndicator	|=dstInd;
-					break;
-				}
-			}
-
-			ExeWrite(exe, lineNum, instruction, argIndicator, srcArg, dstArg);
+			ExeWrite(exe, lineNum, instruction, argInd, args);
 
 			return	true;
 		}
 
 		//return 1 if grabbed arg, 0 if didn't, 2 if error
-		byte ParseArgToken(string tok, ref byte argIndicator, ref UInt64 arg, int lineNum)
+		byte ParseArgToken(string tok, ref byte argIndicator, ref UInt16 arg, int lineNum)
 		{
 			tok	=tok.Trim();
 			tok	=tok.Trim(',');	//rid of comma if here
@@ -325,7 +311,7 @@ namespace UserCodeLib
 
 			if(tok.StartsWith("reg"))
 			{
-				argIndicator	=SrcRegister;
+				argIndicator	=DstRegister;
 				GetRegisterArg(tok, ref arg, lineNum);
 			}
 			else if(tok.StartsWith("["))
@@ -333,12 +319,12 @@ namespace UserCodeLib
 				string	pointerTok	=tok.Trim('[', ']');
 				if(char.IsDigit(pointerTok[0]))
 				{
-					argIndicator	=SrcPointer;
+					argIndicator	=DstPointer;
 					GetAddressArg(tok, ref arg, lineNum);
 				}
 				else if(pointerTok.StartsWith("reg"))
 				{
-					argIndicator	=SrcRegPointer;
+					argIndicator	=DstRegPointer;
 					GetRegisterArg(pointerTok, ref arg, lineNum);
 				}
 				else
@@ -352,20 +338,20 @@ namespace UserCodeLib
 				//label or numerical constant?
 				if(char.IsDigit(tok[0]))
 				{
-					argIndicator	=SrcNumber;
+					argIndicator	=DstNumber;
 					GetNumericalArg(tok, ref arg, lineNum);
 				}
 				else if(mLabels.Contains(tok))
 				{
-					argIndicator	=SrcLabel;
+					argIndicator	=DstLabel;
 
 					//the address might not be known yet
 					//so just put the index of the label
-					arg	=(UInt64)mLabels.IndexOf(tok);
+					arg	=(UInt16)mLabels.IndexOf(tok);
 				}
 				else if(mVars.Contains(tok))
 				{
-					argIndicator	=SrcVariable;
+					argIndicator	=DstVariable;
 					arg				=mVarAddrs[mVars.IndexOf(tok)];
 				}
 				else
@@ -379,14 +365,14 @@ namespace UserCodeLib
 		}
 
 		//prescan for labels
-		void GrabLabels(StreamReader src)
+		void GrabLabels(StreamReader code)
 		{
 			mLabels		=new List<string>();
-			mLabelAddrs	=new List<UInt64>();
+			mLabelAddrs	=new List<UInt16>();
 
 			for(;;)
 			{
-				string	line	=src.ReadLine();
+				string	line	=code.ReadLine();
 
 				string	[]toks	=line.Split(' ');
 
@@ -405,27 +391,27 @@ namespace UserCodeLib
 					}
 				}
 
-				if(src.EndOfStream)
+				if(code.EndOfStream)
 				{
 					break;
 				}
 			}
 
-			src.BaseStream.Seek(0, SeekOrigin.Begin);
+			code.BaseStream.Seek(0, SeekOrigin.Begin);
 		}
 
 		//prescan for variables
-		void GrabVars(StreamReader src)
+		void GrabVars(StreamReader code)
 		{
 			mVars		=new List<string>();
-			mVarAddrs	=new List<UInt64>();
+			mVarAddrs	=new List<UInt16>();
 
 			//skip exe magic number
-			UInt64	varAddress	=StartVarAddr;
+			UInt16	varAddress	=StartVarAddr;
 
 			for(;;)
 			{
-				string	line	=src.ReadLine();
+				string	line	=code.ReadLine();
 
 				string	[]toks	=line.Split(' ', '\t', ',');
 
@@ -453,13 +439,13 @@ namespace UserCodeLib
 					}
 				}
 
-				if(src.EndOfStream)
+				if(code.EndOfStream)
 				{
 					break;
 				}
 			}
 
-			src.BaseStream.Seek(0, SeekOrigin.Begin);
+			code.BaseStream.Seek(0, SeekOrigin.Begin);
 		}
 
 		bool IsValidVariable(string varText)
@@ -513,7 +499,7 @@ namespace UserCodeLib
 		}
 
 
-		bool GetRegisterArg(string tok, ref UInt64 srcArg, int lineNum)
+		bool GetRegisterArg(string tok, ref UInt16 arg, int lineNum)
 		{
 			//trim reg
 			tok	=tok.Substring(3);
@@ -525,13 +511,13 @@ namespace UserCodeLib
 				return	false;
 			}
 
-			srcArg	=regAddr;
+			arg	=regAddr;
 			return	true;
 		}
 
-		bool GetNumericalArg(string tok, ref UInt64 srcArg, int lineNum)
+		bool GetNumericalArg(string tok, ref UInt16 arg, int lineNum)
 		{
-			if(!UInt64.TryParse(tok, out srcArg))
+			if(!UInt16.TryParse(tok, out arg))
 			{
 				mScreen.Print("Invalid numerical constant: " + tok + " at line: " + lineNum);
 				return	false;
@@ -539,13 +525,13 @@ namespace UserCodeLib
 			return	true;
 		}
 
-		bool GetAddressArg(string tok, ref UInt64 srcArg, int lineNum)
+		bool GetAddressArg(string tok, ref UInt16 srcArg, int lineNum)
 		{
 			//trim bracketses
 			tok	=tok.TrimStart('[');
 			tok	=tok.TrimEnd(']');
 
-			if(!UInt64.TryParse(tok, out srcArg))
+			if(!UInt16.TryParse(tok, out srcArg))
 			{
 				mScreen.Print("Invalid address: " + tok + " at line: " + lineNum);
 				return	false;
@@ -553,7 +539,8 @@ namespace UserCodeLib
 			return	true;
 		}
 
-		void ExeWrite(Ram exe, int lineNum, byte instruction, byte argIndicator, UInt64 src, UInt64 dst)
+		void ExeWrite(Ram exe, int lineNum, byte instruction,
+						byte []argInds, UInt16 []args)
 		{
 			int	numOperands	=mNumOperands[instruction];
 
@@ -568,23 +555,24 @@ namespace UserCodeLib
 				return;
 			}
 
+			byte	argIndicator	=(byte)(argInds[0] | (argInds[1] << 4));
 			if(!exe.WriteByte(argIndicator))
 			{
 				mScreen.Print("Error writing to exe at line " + lineNum);
 				return;
 			}
 
-			if((argIndicator & 0xF) == SrcRegister
-				|| (argIndicator & 0xF) == SrcRegPointer)
+			if((argIndicator & 0xF) == DstRegister
+				|| (argIndicator & 0xF) == DstRegPointer)
 			{
-				if(!exe.WriteByte((byte)src))	//register
+				if(!exe.WriteByte((byte)args[0]))	//register
 				{
 					mScreen.Print("Error writing to exe at line " + lineNum);
 				}
 			}
 			else	//addr or label
 			{
-				WriteExeValue(exe, src, lineNum);
+				exe.WriteWord(args[0]);
 			}
 
 			if(numOperands <= 1)
@@ -592,14 +580,20 @@ namespace UserCodeLib
 				return;
 			}
 
-			if((argIndicator & 0xF0) == DstRegister
-				|| (argIndicator & 0xF0) == DstRegPointer)
+			if((argIndicator & 0xF0) == SrcRegister
+				|| (argIndicator & 0xF0) == SrcRegPointer)
 			{
-				exe.WriteByte((byte)dst);	//register
+				exe.WriteByte((byte)args[1]);	//register
 			}
 			else	//addr or label
 			{
-				WriteExeValue(exe, dst, lineNum);
+				//WriteExeValue(exe, dst, lineNum);
+				exe.WriteWord(args[1]);
+			}
+
+			if(numOperands == 3)
+			{
+				exe.WriteByte((byte)args[2]);
 			}
 		}
 
@@ -699,20 +693,32 @@ namespace UserCodeLib
 			//count instructions
 			byte	instIdx	=0;
 
-			//mov src, dst
+			//mov dst, src
 			mInstructions.Add("mov", instIdx);
 			mNumOperands.Add(instIdx++, 2);
 
 			mInstructions.Add("addrof", instIdx);
 			mNumOperands.Add(instIdx++, 2);
 
-			//add src, dst
+			//add dst, src
 			mInstructions.Add("add", instIdx);
 			mNumOperands.Add(instIdx++, 2);
 
-			//mul src, dst
+			//mul dst, src
 			mInstructions.Add("mul", instIdx);
 			mNumOperands.Add(instIdx++, 2);
+
+			//integer mul dst, src
+			mInstructions.Add("imul", instIdx);
+			mNumOperands.Add(instIdx++, 2);
+
+			//div dst, src
+			mInstructions.Add("div", instIdx);
+			mNumOperands.Add(instIdx++, 3);
+
+			//integer div dst, src
+			mInstructions.Add("idiv", instIdx);
+			mNumOperands.Add(instIdx++, 3);
 
 			//inc dst
 			mInstructions.Add("inc", instIdx);
@@ -730,15 +736,15 @@ namespace UserCodeLib
 			mInstructions.Add("not", instIdx);
 			mNumOperands.Add(instIdx++, 1);
 
-			//xor src, dst
+			//xor dst, src
 			mInstructions.Add("xor", instIdx);
 			mNumOperands.Add(instIdx++, 2);
 
-			//or src, dst
+			//or dst, src
 			mInstructions.Add("or", instIdx);
 			mNumOperands.Add(instIdx++, 2);
 
-			//and src, dst
+			//and dst, src
 			mInstructions.Add("and", instIdx);
 			mNumOperands.Add(instIdx++, 2);
 
@@ -750,9 +756,57 @@ namespace UserCodeLib
 			mInstructions.Add("cmp", instIdx);
 			mNumOperands.Add(instIdx++, 2);
 
-			//je label
+			//jmp jump label
+			mInstructions.Add("jmp", instIdx);			
+			mNumOperands.Add(instIdx++, 1);
+
+			//je jump equal label
 			mInstructions.Add("je", instIdx);
 			mNumOperands.Add(instIdx++, 1);
+
+			//jne jump not equal label
+			mInstructions.Add("jne", instIdx);
+			mNumOperands.Add(instIdx++, 1);
+
+			//jg jump greater label
+			mInstructions.Add("jg", instIdx);			
+			mNumOperands.Add(instIdx++, 1);
+
+			//jge jump greater or equal label
+			mInstructions.Add("jge", instIdx);			
+			mNumOperands.Add(instIdx++, 1);
+
+			//jl jump less label
+			mInstructions.Add("jl", instIdx);			
+			mNumOperands.Add(instIdx++, 1);
+
+			//jle jump less or equal label
+			mInstructions.Add("jle", instIdx);			
+			mNumOperands.Add(instIdx++, 1);
+
+			//conditional equal mov
+			mInstructions.Add("cmove", instIdx);
+			mNumOperands.Add(instIdx++, 2);
+
+			//conditional not equal mov
+			mInstructions.Add("cmovne", instIdx);
+			mNumOperands.Add(instIdx++, 2);
+
+			//conditional greater mov
+			mInstructions.Add("cmovg", instIdx);
+			mNumOperands.Add(instIdx++, 2);
+
+			//conditional greater or equal mov
+			mInstructions.Add("cmovge", instIdx);
+			mNumOperands.Add(instIdx++, 2);
+
+			//conditional less mov
+			mInstructions.Add("cmovl", instIdx);
+			mNumOperands.Add(instIdx++, 2);
+
+			//conditional less or equal mov
+			mInstructions.Add("cmovle", instIdx);
+			mNumOperands.Add(instIdx++, 2);
 		}
 	}
 }

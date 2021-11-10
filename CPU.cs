@@ -7,12 +7,13 @@ namespace UserCodeLib
 	internal class CPU
 	{
 		Registers	mRegs;
+		Flags		mFlags	=new Flags();
 
 		Ram	mCurCodePage;
 
 		OS	mOS;
 
-		delegate void Instruction(byte instruction, byte args, UInt64 src, UInt64 dst, Ram data);
+		delegate void Instruction(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data);
 
 		Dictionary<byte, Instruction>	mInstructionTable	=new Dictionary<byte, Instruction>();
 
@@ -25,7 +26,7 @@ namespace UserCodeLib
 		const byte		SrcLabel		=3;				//ex: jmp label
 		const byte		SrcNumber		=4;				//ex: mov 7, reg00
 		const byte		SrcRegPointer	=5;				//ex: mov [reg00], reg01
-		const byte		SrcVariable		=6;				//ex: mov i, reg00 Converts to SrcPointer after compile
+		const byte		SrcVariable		=6;				//ex: mov i, reg00
 		const byte		DstRegister		=SrcRegister << 4;
 		const byte		DstPointer		=SrcPointer << 4;
 		const byte		DstLabel		=SrcLabel << 4;
@@ -45,6 +46,19 @@ namespace UserCodeLib
 			mInstructionTable.Add(0, Mov);
 			mInstructionTable.Add(1, AddrOf);
 			mInstructionTable.Add(2, Add);
+			mInstructionTable.Add(3, Mul);
+			mInstructionTable.Add(4, IMul);
+			mInstructionTable.Add(5, Div);
+			mInstructionTable.Add(6, IDiv);
+			mInstructionTable.Add(7, Inc);
+			mInstructionTable.Add(8, Dec);
+			mInstructionTable.Add(9, Neg);
+			mInstructionTable.Add(10, Not);
+			mInstructionTable.Add(11, Xor);
+			mInstructionTable.Add(12, Or);
+			mInstructionTable.Add(13, And);
+			mInstructionTable.Add(14, Tst);
+			mInstructionTable.Add(15, Cmp);
 		}
 
 
@@ -79,7 +93,7 @@ namespace UserCodeLib
 				byte	srcArg	=(byte)(args & 0xF);
 				byte	dstArg	=(byte)(args & 0xF0);
 
-				UInt64	src	=0;
+				UInt16	src	=0;
 				if(srcArg != 0)
 				{
 					if(srcArg == SrcRegister || srcArg == SrcRegPointer)
@@ -88,11 +102,11 @@ namespace UserCodeLib
 					}
 					else
 					{
-						src	=ReadExeValue(code);
+						src	=code.ReadWord();
 					}
 				}
 
-				UInt64	dst	=0;
+				UInt16	dst	=0;
 				if(dstArg != 0)
 				{
 					if(dstArg == DstRegister || dstArg == DstRegPointer)
@@ -101,11 +115,18 @@ namespace UserCodeLib
 					}
 					else
 					{
-						dst	=ReadExeValue(code);
+						dst	=code.ReadWord();
 					}
 				}
 
-				mInstructionTable[instruction](instruction, args, src, dst, data);
+				UInt16	opt	=0;
+				if(instruction >= 5 && instruction <= 6)
+				{
+					//div or idiv
+					opt	=code.ReadByte();
+				}
+
+				mInstructionTable[instruction](args, dst, src, opt, data);
 
 				//out of bounds?
 				if(code.GetPointer() >= exeSize)
@@ -116,7 +137,7 @@ namespace UserCodeLib
 		}
 
 
-		UInt64 GetDstAddress(UInt64 dst, byte args, Ram data)
+		UInt16 GetDstAddress(UInt16 dst, byte args, Ram data)
 		{
 			if((args & 0xF0) == DstPointer)
 			{
@@ -130,11 +151,11 @@ namespace UserCodeLib
 			{
 				return	dst;
 			}
-			return	0xFFFFFFFFFFFFFFFF;
+			return	0xFFFF;
 		}
 
 
-		UInt64 GetDstValue(UInt64 dst, byte args, Ram data)
+		UInt16 GetDstValue(UInt16 dst, byte args, Ram data)
 		{
 			if((args & 0xF0) == DstRegister)
 			{
@@ -155,11 +176,11 @@ namespace UserCodeLib
 				data.SetPointer(mRegs.Get16((int)dst));
 				return	data.ReadWord();
 			}
-			return	0xFFFFFFFFFFFFFFFF;
+			return	0xFFFF;
 		}
 
 
-		UInt64 GetSrcValue(UInt64 src, byte args, Ram data)
+		UInt16 GetSrcValue(UInt16 src, byte args, Ram data)
 		{
 			//get src val
 			UInt16	srcVal	=0;
@@ -174,7 +195,7 @@ namespace UserCodeLib
 			}
 			else if((args & 0xF) == SrcLabel || (args & 0xF) == SrcNumber)
 			{
-				srcVal	=(UInt16)src;
+				srcVal	=src;
 			}
 			else if((args & 0xF) == SrcRegPointer)
 			{
@@ -186,7 +207,7 @@ namespace UserCodeLib
 		}
 
 
-		void WriteDst(UInt64 val, byte args, UInt64 dst, Ram data)
+		void WriteDst(UInt16 val, byte args, UInt16 dst, Ram data)
 		{
 			if((args & 0xF0) == DstRegister)
 			{
@@ -199,27 +220,27 @@ namespace UserCodeLib
 				UInt64	cur	=mCurCodePage.GetPointer();
 
 				mCurCodePage.SetPointer(dst);
-				mCurCodePage.WriteWord((UInt16)val);
+				mCurCodePage.WriteWord(val);
 
 				mCurCodePage.SetPointer(cur);
 			}
 			else	//pointer, number
 			{
 				data.SetPointer(GetDstAddress(dst, args, data));
-				data.WriteWord((UInt16)val);
+				data.WriteWord(val);
 			}
 		}
 
 
-		void Mov(byte instruction, byte args, UInt64 src, UInt64 dst, Ram data)
+		void Mov(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
 		{
-			UInt64	srcVal	=GetSrcValue(src, args, data);
+			UInt16	srcVal	=GetSrcValue(src, args, data);
 
 			WriteDst(srcVal, args, dst, data);
 		}
 
 
-		void AddrOf(byte instruction, byte args, UInt64 src, UInt64 dst, Ram data)
+		void AddrOf(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
 		{
 			if((args & 0x0F) != SrcVariable)
 			{
@@ -229,12 +250,140 @@ namespace UserCodeLib
 		}
 
 
-		void Add(byte instruction, byte args, UInt64 src, UInt64 dst, Ram data)
+		void Add(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
 		{
-			UInt64	srcVal	=GetSrcValue(src, args, data);
-			UInt64	dstVal	=GetDstValue(dst, args, data);
+			UInt16	srcVal	=GetSrcValue(src, args, data);
+			UInt16	dstVal	=GetDstValue(dst, args, data);
 
-			WriteDst(srcVal + dstVal, args, dst, data);
+			WriteDst((UInt16)(srcVal + dstVal), args, dst, data);
+		}
+
+
+		void Mul(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	srcVal	=GetSrcValue(src, args, data);
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			WriteDst((UInt16)(srcVal * dstVal), args, dst, data);
+		}
+
+
+		void IMul(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			Int16	srcVal	=(Int16)GetSrcValue(src, args, data);
+			Int16	dstVal	=(Int16)GetDstValue(dst, args, data);
+
+			WriteDst((UInt16)(srcVal * dstVal), args, dst, data);
+		}
+
+
+		void Div(byte args, UInt16 dst, UInt16 src, UInt16 remainder, Ram data)
+		{
+			UInt16	srcVal	=GetSrcValue(src, args, data);
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			WriteDst((UInt16)(srcVal * dstVal), args, dst, data);
+
+			mRegs.Set16(remainder, (UInt16)(dstVal % srcVal));
+		}
+
+
+		void IDiv(byte args, UInt16 dst, UInt16 src, UInt16 remainder, Ram data)
+		{
+			Int16	srcVal	=(Int16)GetSrcValue(src, args, data);
+			Int16	dstVal	=(Int16)GetDstValue(dst, args, data);
+
+			WriteDst((UInt16)(srcVal * dstVal), args, dst, data);
+
+			mRegs.Set16(remainder, (UInt16)(dstVal % srcVal));
+		}
+
+
+		void Inc(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			dstVal++;
+
+			WriteDst(dstVal, args, dst, data);
+		}
+
+
+		void Dec(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			dstVal--;
+
+			WriteDst(dstVal, args, dst, data);
+		}
+
+
+		void Neg(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			//TODO: test
+			dstVal	=(UInt16)~dstVal;
+			dstVal++;
+
+			WriteDst(dstVal, args, dst, data);
+		}
+
+
+		void Not(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			//TODO: test
+			dstVal	=(UInt16)~dstVal;
+			
+			WriteDst(dstVal, args, dst, data);
+		}
+
+
+		void Xor(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	srcVal	=GetSrcValue(src, args, data);
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			WriteDst((UInt16)(srcVal ^ dstVal), args, dst, data);
+		}
+
+
+		void Or(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	srcVal	=GetSrcValue(src, args, data);
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			WriteDst((UInt16)(srcVal | dstVal), args, dst, data);
+		}
+
+
+		void And(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	srcVal	=GetSrcValue(src, args, data);
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			WriteDst((UInt16)(srcVal & dstVal), args, dst, data);
+		}
+
+
+		void Tst(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	srcVal	=GetSrcValue(src, args, data);
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			mFlags.FlagAnd(dstVal, srcVal);
+		}
+
+
+		void Cmp(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			UInt16	srcVal	=GetSrcValue(src, args, data);
+			UInt16	dstVal	=GetDstValue(dst, args, data);
+
+			mFlags.FlagSubtract(dstVal, srcVal);
 		}
 
 

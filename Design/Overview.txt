@@ -5,36 +5,41 @@ Goals
 	Limited speed / storage based on how the in-game computer was built
 Asm
 	Instructions
-		mov		src, dst
+		mov		dst, src
 		addrOf	var, dst	//store address of variable var in dst
-		add		src, dst
-		mul		src, dst
+		add		dst, src
+		mul		dst, src
+		imul	dst, src
+		div		dst, src, reg	//divide dst by src and store in dst, remainder in reg
+		idiv	dst, src, reg	//divide dst by src and store in dst, remainder in reg
 		inc		dst
 		dec		dst
 		neg		dst
 		not		dst
-		xor		src, dst
-		or		src, dst
-		and		src, dst
+		xor		dst, src
+		or		dst, src
+		and		dst, src
 		tst		x, y		//set flags by y & x
 		cmp		x, y		//set flags by y - x
+		jmp		label		//jump
 		je		label		//jump if equal
 		jne		label		//jump if not equal
 		jg		label		//jump if greater than
 		jge		label		//jump if greater than or equal
 		jl		label		//jump if less than
 		jle		label		//jump if less than or equal
-		cmove	src, dst	//mov if equal
-		cmovne	src, dst	//mov if not equal
-		cmovg	src, dst	//mov if greater than
-		cmovge	src, dst	//mov if greater than or equal
-		cmovl	src, dst	//mov if less than
-		cmovle	src, dst	//mov if less than or equal
-		call	src, dst	//function call to address in src, pagenum in dst
+		cmove	dst, src	//mov if equal
+		cmovne	dst, src	//mov if not equal
+		cmovg	dst, src	//mov if greater than
+		cmovge	dst, src	//mov if greater than or equal
+		cmovl	dst, src	//mov if less than
+		cmovle	dst, src	//mov if less than or equal
+		call	dst, src	//function call to address in dst, optional pagenum in src
 	Flags
 		CF	carry
 		ZF	zero
 		SF	sign
+		OF	overflow
 	Labels
 		word with a : at the end
 		Can be used as a jmp target or for self modifying code
