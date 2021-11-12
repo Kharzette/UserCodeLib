@@ -54,7 +54,7 @@ namespace UserCodeLib
 
 		//borrowed alot of this flag stuff from x86 emulators
 		//on github, namely the one from shift-crops, thanks!
-		internal void FlagAdd(UInt16 src, UInt16 dst)
+		internal void FlagAdd(UInt16 dst, UInt16 src)
 		{
 			UInt32	result	=(UInt32)dst + src;
 
@@ -91,13 +91,38 @@ namespace UserCodeLib
 			bZero		=(result == 0);	//undefined on x86
 		}
 
-		internal void FlagIMul(UInt16 dst, UInt16 src)
+		internal void FlagIMul(Int16 dst, Int16 src)
 		{
-			UInt32	result	=(UInt32)dst * src;
+			Int32	result	=dst * src;
 
-			bCarry		=((result >> 16) != 0xFFFFFFFF);
-			bOverFlow	=((result >> 16) != 0xFFFFFFFF);
+			bCarry		=((result >> 16) != -1);
+			bOverFlow	=((result >> 16) != -1);
 			bZero		=(result == 0);	//undefined on x86
+		}
+
+		//like add but preserves carry flag?
+		internal void FlagInc(UInt16 dst)
+		{
+			UInt32	result	=(UInt32)dst + 1;
+
+			bool	dstSign	=((dst >> 15) != 0);
+			bool	resSign	=(((result >> 15) & 1) != 0);
+
+			bZero		=(result == 0);
+			bSign		=resSign;
+			bOverFlow	=(!(false ^ dstSign) && false ^ resSign);
+		}
+
+		internal void FlagDec(UInt16 dst)
+		{
+			UInt32	result	=(UInt32)dst - 1;
+
+			bool	dstSign	=((dst >> 15) != 0);
+			bool	resSign	=(((result >> 15) & 1) != 0);
+
+			bZero		=(result == 0);
+			bSign		=resSign;
+			bOverFlow	=(false ^ dstSign && false ^ resSign);
 		}
 
 		internal void FlagAnd(UInt16 dst, UInt16 src)

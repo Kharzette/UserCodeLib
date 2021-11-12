@@ -1,6 +1,8 @@
 x	Proper error reporting with line numbers
 x	Numerical constants as arguments
 x	Variables
+	Validation of argument type per instruction?
+		Like how "number" isn't really valid for a mov destination etc
 	need more clarity in execution args
 		address / value
 	Functions

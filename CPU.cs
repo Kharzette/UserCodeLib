@@ -256,6 +256,7 @@ namespace UserCodeLib
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
 			WriteDst((UInt16)(srcVal + dstVal), args, dst, data);
+			mFlags.FlagAdd(dstVal, srcVal);
 		}
 
 
@@ -265,6 +266,7 @@ namespace UserCodeLib
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
 			WriteDst((UInt16)(srcVal * dstVal), args, dst, data);
+			mFlags.FlagMul(dstVal, srcVal);
 		}
 
 
@@ -274,6 +276,7 @@ namespace UserCodeLib
 			Int16	dstVal	=(Int16)GetDstValue(dst, args, data);
 
 			WriteDst((UInt16)(srcVal * dstVal), args, dst, data);
+			mFlags.FlagIMul(dstVal, srcVal);
 		}
 
 
@@ -306,6 +309,7 @@ namespace UserCodeLib
 			dstVal++;
 
 			WriteDst(dstVal, args, dst, data);
+			mFlags.FlagInc(dstVal);
 		}
 
 
@@ -316,6 +320,7 @@ namespace UserCodeLib
 			dstVal--;
 
 			WriteDst(dstVal, args, dst, data);
+			mFlags.FlagDec(dstVal);
 		}
 
 
@@ -328,6 +333,9 @@ namespace UserCodeLib
 			dstVal++;
 
 			WriteDst(dstVal, args, dst, data);
+
+			//I THINK this will work
+			mFlags.FlagSubtract(0, dstVal);
 		}
 
 
@@ -348,6 +356,9 @@ namespace UserCodeLib
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
 			WriteDst((UInt16)(srcVal ^ dstVal), args, dst, data);
+
+			//should be the same as and
+			mFlags.FlagAnd(dstVal, srcVal);
 		}
 
 
@@ -357,6 +368,7 @@ namespace UserCodeLib
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
 			WriteDst((UInt16)(srcVal | dstVal), args, dst, data);
+			mFlags.FlagOr(dstVal, srcVal);
 		}
 
 
@@ -366,6 +378,7 @@ namespace UserCodeLib
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
 			WriteDst((UInt16)(srcVal & dstVal), args, dst, data);
+			mFlags.FlagAnd(dstVal, srcVal);
 		}
 
 
