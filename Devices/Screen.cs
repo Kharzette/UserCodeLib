@@ -19,6 +19,8 @@ namespace UserCodeLib
 			mMode	=mode;
 			mWidth	=width;
 			mHeight	=height;
+
+			mVidRam	=new Ram();
 		}
 
 

@@ -21,18 +21,18 @@ namespace UserCodeLib
 		const int		Num32Regs		=24;
 		const int		Num64Regs		=32;
 		const UInt32	ExeMagic		=0xF00CF00D;	//exe marker
-		const byte		SrcRegister		=1;				//ex: mov reg00, reg01
-		const byte		SrcPointer		=2;				//ex: mov [69], reg00
-		const byte		SrcLabel		=3;				//ex: jmp label
-		const byte		SrcNumber		=4;				//ex: mov 7, reg00
-		const byte		SrcRegPointer	=5;				//ex: mov [reg00], reg01
-		const byte		SrcVariable		=6;				//ex: mov i, reg00
-		const byte		DstRegister		=SrcRegister << 4;
-		const byte		DstPointer		=SrcPointer << 4;
-		const byte		DstLabel		=SrcLabel << 4;
-		const byte		DstNumber		=SrcNumber << 4;
-		const byte		DstRegPointer	=SrcRegPointer << 4;
-		const byte		DstVariable		=SrcVariable << 4;
+		const byte		DstRegister		=1;				//ex: mov reg00, reg01
+		const byte		DstPointer		=2;				//ex: mov [69], reg00
+		const byte		DstLabel		=3;				//ex: jmp label
+		const byte		DstNumber		=4;				//ex: mov 7, reg00
+		const byte		DstRegPointer	=5;				//ex: mov [reg00], reg01
+		const byte		DstVariable		=6;				//ex: mov i, reg00
+		const byte		SrcRegister		=DstRegister << 4;
+		const byte		SrcPointer		=DstPointer << 4;
+		const byte		SrcLabel		=DstLabel << 4;
+		const byte		SrcNumber		=DstNumber << 4;
+		const byte		SrcRegPointer	=DstRegPointer << 4;
+		const byte		SrcVariable		=DstVariable << 4;
 
 
 		internal CPU(OS os)
@@ -43,22 +43,38 @@ namespace UserCodeLib
 
 			mRegs.Init(Num16Regs, Num32Regs, Num64Regs);
 
-			mInstructionTable.Add(0, Mov);
-			mInstructionTable.Add(1, AddrOf);
-			mInstructionTable.Add(2, Add);
-			mInstructionTable.Add(3, Mul);
-			mInstructionTable.Add(4, IMul);
-			mInstructionTable.Add(5, Div);
-			mInstructionTable.Add(6, IDiv);
-			mInstructionTable.Add(7, Inc);
-			mInstructionTable.Add(8, Dec);
-			mInstructionTable.Add(9, Neg);
-			mInstructionTable.Add(10, Not);
-			mInstructionTable.Add(11, Xor);
-			mInstructionTable.Add(12, Or);
-			mInstructionTable.Add(13, And);
-			mInstructionTable.Add(14, Tst);
-			mInstructionTable.Add(15, Cmp);
+			byte	idx	=0;
+			mInstructionTable.Add(idx++, Mov);
+			mInstructionTable.Add(idx++, AddrOf);
+			mInstructionTable.Add(idx++, Add);
+			mInstructionTable.Add(idx++, Mul);
+			mInstructionTable.Add(idx++, IMul);
+			mInstructionTable.Add(idx++, Div);
+			mInstructionTable.Add(idx++, IDiv);
+			mInstructionTable.Add(idx++, Inc);
+			mInstructionTable.Add(idx++, Dec);
+			mInstructionTable.Add(idx++, Neg);
+			mInstructionTable.Add(idx++, Not);
+			mInstructionTable.Add(idx++, Xor);
+			mInstructionTable.Add(idx++, Or);
+			mInstructionTable.Add(idx++, And);
+			mInstructionTable.Add(idx++, Tst);
+			mInstructionTable.Add(idx++, Cmp);
+			mInstructionTable.Add(idx++, Jmp);
+			mInstructionTable.Add(idx++, Je);
+			mInstructionTable.Add(idx++, Jne);
+			mInstructionTable.Add(idx++, Jg);
+			mInstructionTable.Add(idx++, Jge);
+			mInstructionTable.Add(idx++, Jl);
+			mInstructionTable.Add(idx++, Jle);
+			mInstructionTable.Add(idx++, Jz);
+			mInstructionTable.Add(idx++, Jnz);
+			mInstructionTable.Add(idx++, CMovE);
+			mInstructionTable.Add(idx++, CMovNE);
+			mInstructionTable.Add(idx++, CMovG);
+			mInstructionTable.Add(idx++, CMovGE);
+			mInstructionTable.Add(idx++, CMovL);
+			mInstructionTable.Add(idx++, CMovLE);
 		}
 
 
@@ -90,8 +106,26 @@ namespace UserCodeLib
 
 				byte	args	=code.ReadByte();
 
-				byte	srcArg	=(byte)(args & 0xF);
-				byte	dstArg	=(byte)(args & 0xF0);
+				byte	dstArg	=(byte)(args & 0x0F);
+				byte	srcArg	=(byte)(args & 0xF0);
+
+				UInt16	dst	=0;
+				if(dstArg != 0)
+				{
+					if(dstArg == DstNumber)
+					{
+						mOS.Print("Dest number argument at " + code.GetPointer());
+						return;
+					}
+					else if(dstArg == DstRegister || dstArg == DstRegPointer)
+					{
+						dst	=code.ReadByte();
+					}
+					else
+					{
+						dst	=code.ReadWord();
+					}
+				}
 
 				UInt16	src	=0;
 				if(srcArg != 0)
@@ -103,19 +137,6 @@ namespace UserCodeLib
 					else
 					{
 						src	=code.ReadWord();
-					}
-				}
-
-				UInt16	dst	=0;
-				if(dstArg != 0)
-				{
-					if(dstArg == DstRegister || dstArg == DstRegPointer)
-					{
-						dst	=code.ReadByte();
-					}
-					else
-					{
-						dst	=code.ReadWord();
 					}
 				}
 
@@ -139,15 +160,15 @@ namespace UserCodeLib
 
 		UInt16 GetDstAddress(UInt16 dst, byte args, Ram data)
 		{
-			if((args & 0xF0) == DstPointer)
+			if((args & 0x0F) == DstPointer)
 			{
 				return	dst;
 			}
-			else if((args & 0xF0) == DstRegPointer)
+			else if((args & 0x0F) == DstRegPointer)
 			{
 				return	mRegs.Get16((int)dst);
 			}
-			else if((args & 0xF0) == DstVariable)
+			else if((args & 0x0F) == DstVariable)
 			{
 				return	dst;
 			}
@@ -157,21 +178,21 @@ namespace UserCodeLib
 
 		UInt16 GetDstValue(UInt16 dst, byte args, Ram data)
 		{
-			if((args & 0xF0) == DstRegister)
+			if((args & 0x0F) == DstRegister)
 			{
 				return	mRegs.Get16((int)dst);
 			}
-			else if((args & 0xF0) == DstPointer)
+			else if((args & 0x0F) == DstPointer)
 			{
 				data.SetPointer(dst);
 				return	data.ReadWord();
 			}
-			else if((args & 0xF0) == DstLabel || (args & 0xF0) == DstNumber
-					|| (args & 0xF0) == DstVariable)
+			else if((args & 0x0F) == DstLabel || (args & 0x0F) == DstNumber
+					|| (args & 0x0F) == DstVariable)
 			{
 				return	dst;
 			}
-			else if((args & 0xF0) == DstRegPointer)
+			else if((args & 0x0F) == DstRegPointer)
 			{
 				data.SetPointer(mRegs.Get16((int)dst));
 				return	data.ReadWord();
@@ -184,20 +205,20 @@ namespace UserCodeLib
 		{
 			//get src val
 			UInt16	srcVal	=0;
-			if((args & 0xF) == SrcRegister)
+			if((args & 0xF0) == SrcRegister)
 			{
 				srcVal	=mRegs.Get16((int)src);
 			}
-			else if((args & 0xF) == SrcPointer || (args & 0xF) == SrcVariable)
+			else if((args & 0xF0) == SrcPointer || (args & 0xF0) == SrcVariable)
 			{
 				data.SetPointer(src);
 				srcVal	=data.ReadWord();
 			}
-			else if((args & 0xF) == SrcLabel || (args & 0xF) == SrcNumber)
+			else if((args & 0xF0) == SrcLabel || (args & 0xF0) == SrcNumber)
 			{
 				srcVal	=src;
 			}
-			else if((args & 0xF) == SrcRegPointer)
+			else if((args & 0xF0) == SrcRegPointer)
 			{
 				data.SetPointer(mRegs.Get16((int)src));
 				srcVal	=data.ReadWord();
@@ -209,11 +230,11 @@ namespace UserCodeLib
 
 		void WriteDst(UInt16 val, byte args, UInt16 dst, Ram data)
 		{
-			if((args & 0xF0) == DstRegister)
+			if((args & 0x0F) == DstRegister)
 			{
 				mRegs.Set16((int)dst, (UInt16)val);
 			}
-			else if((args & 0xF0) == DstLabel)
+			else if((args & 0x0F) == DstLabel)
 			{
 				//self mod code!  Tricksy!
 				//save / restore current pointer
@@ -242,7 +263,7 @@ namespace UserCodeLib
 
 		void AddrOf(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
 		{
-			if((args & 0x0F) != SrcVariable)
+			if((args & 0xF0) != SrcVariable)
 			{
 				return;	//only makes sense for variable
 			}
@@ -397,6 +418,140 @@ namespace UserCodeLib
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
 			mFlags.FlagSubtract(dstVal, srcVal);
+		}
+
+
+		void Jmp(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			//can't remember if dst arrives as the memory location
+			//or if it is still an index
+			mCurCodePage.SetPointer(dst);
+		}
+
+
+		void Je(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetZero())
+			{
+				mCurCodePage.SetPointer(dst);
+			}
+		}
+
+
+		void Jne(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(!mFlags.GetZero())
+			{
+				mCurCodePage.SetPointer(dst);
+			}
+		}
+
+
+		void Jg(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(!mFlags.GetZero() && mFlags.GetSign() == mFlags.GetOverFlow())
+			{
+				mCurCodePage.SetPointer(dst);
+			}
+		}
+
+
+		void Jge(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetSign() == mFlags.GetOverFlow())
+			{
+				mCurCodePage.SetPointer(dst);
+			}
+		}
+
+
+		void Jl(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetSign() != mFlags.GetOverFlow())
+			{
+				mCurCodePage.SetPointer(dst);
+			}
+		}
+
+
+		void Jle(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetZero() || mFlags.GetSign() != mFlags.GetOverFlow())
+			{
+				mCurCodePage.SetPointer(dst);
+			}
+		}
+
+
+		void Jz(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetZero())
+			{
+				mCurCodePage.SetPointer(dst);
+			}
+		}
+
+
+		void Jnz(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(!mFlags.GetZero())
+			{
+				mCurCodePage.SetPointer(dst);
+			}
+		}
+
+
+		void CMovE(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetZero())
+			{
+				Mov(args, dst, src, opt, data);
+			}
+		}
+
+
+		void CMovNE(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(!mFlags.GetZero())
+			{
+				Mov(args, dst, src, opt, data);
+			}
+		}
+
+
+		void CMovG(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(!mFlags.GetZero() && mFlags.GetSign() == mFlags.GetOverFlow())
+			{
+				Mov(args, dst, src, opt, data);
+			}
+		}
+
+
+		void CMovGE(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetSign() == mFlags.GetOverFlow())
+			{
+				Mov(args, dst, src, opt, data);
+			}
+		}
+
+
+		void CMovL(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetSign() != mFlags.GetOverFlow())
+			{
+				Mov(args, dst, src, opt, data);
+			}
+		}
+
+
+		void CMovLE(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		{
+			if(mFlags.GetZero() || mFlags.GetSign() != mFlags.GetOverFlow())
+			{
+				Mov(args, dst, src, opt, data);
+			}
 		}
 
 

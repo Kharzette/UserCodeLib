@@ -4,7 +4,7 @@ using System.IO;
 
 namespace UserCodeLib
 {
-	internal class Compiler
+	internal partial class Compiler
 	{
 		//language data
 		Dictionary<string, byte>	mInstructions	=new Dictionary<string, byte>();
@@ -89,7 +89,9 @@ namespace UserCodeLib
 
 		bool ReplaceLabelAddrs(Ram exe)
 		{
-			UInt64	endExe	=exe.GetPointer();
+			exe.SetPointer(4);
+
+			UInt64	endExe	=exe.ReadQWord();
 
 			//buzz through compiled code and fix labels
 			//skip exe number, size qword, and data size qword
@@ -174,7 +176,7 @@ namespace UserCodeLib
 					exe.ReadWord();
 				}
 
-				if(numArgs == 2)
+				if(numArgs == 3)
 				{
 					exe.ReadByte();
 				}
@@ -298,246 +300,6 @@ namespace UserCodeLib
 			return	true;
 		}
 
-		//return 1 if grabbed arg, 0 if didn't, 2 if error
-		byte ParseArgToken(string tok, ref byte argIndicator, ref UInt16 arg, int lineNum)
-		{
-			tok	=tok.Trim();
-			tok	=tok.Trim(',');	//rid of comma if here
-
-			if(tok == "")
-			{
-				return	0;
-			}
-
-			if(tok.StartsWith("reg"))
-			{
-				argIndicator	=DstRegister;
-				GetRegisterArg(tok, ref arg, lineNum);
-			}
-			else if(tok.StartsWith("["))
-			{
-				string	pointerTok	=tok.Trim('[', ']');
-				if(char.IsDigit(pointerTok[0]))
-				{
-					argIndicator	=DstPointer;
-					GetAddressArg(tok, ref arg, lineNum);
-				}
-				else if(pointerTok.StartsWith("reg"))
-				{
-					argIndicator	=DstRegPointer;
-					GetRegisterArg(pointerTok, ref arg, lineNum);
-				}
-				else
-				{
-					mScreen.Print("Syntax error on line: " + lineNum);
-					return	2;
-				}
-			}
-			else
-			{
-				//label or numerical constant?
-				if(char.IsDigit(tok[0]))
-				{
-					argIndicator	=DstNumber;
-					GetNumericalArg(tok, ref arg, lineNum);
-				}
-				else if(mLabels.Contains(tok))
-				{
-					argIndicator	=DstLabel;
-
-					//the address might not be known yet
-					//so just put the index of the label
-					arg	=(UInt16)mLabels.IndexOf(tok);
-				}
-				else if(mVars.Contains(tok))
-				{
-					argIndicator	=DstVariable;
-					arg				=mVarAddrs[mVars.IndexOf(tok)];
-				}
-				else
-				{
-					//error of some sort?
-					mScreen.Print("Unknown token: " + tok + " at line: " + lineNum);
-					return	2;
-				}					
-			}
-			return	1;
-		}
-
-		//prescan for labels
-		void GrabLabels(StreamReader code)
-		{
-			mLabels		=new List<string>();
-			mLabelAddrs	=new List<UInt16>();
-
-			for(;;)
-			{
-				string	line	=code.ReadLine();
-
-				string	[]toks	=line.Split(' ');
-
-				if(toks[0].EndsWith(':'))
-				{
-					//label!
-					string	lab	=toks[0].TrimEnd(':');
-
-					if(!mLabels.Contains(lab))
-					{
-						if(IsValidVariable(lab))
-						{
-							mLabels.Add(lab);
-							mLabelAddrs.Add(0);	//don't know yet
-						}
-					}
-				}
-
-				if(code.EndOfStream)
-				{
-					break;
-				}
-			}
-
-			code.BaseStream.Seek(0, SeekOrigin.Begin);
-		}
-
-		//prescan for variables
-		void GrabVars(StreamReader code)
-		{
-			mVars		=new List<string>();
-			mVarAddrs	=new List<UInt16>();
-
-			//skip exe magic number
-			UInt16	varAddress	=StartVarAddr;
-
-			for(;;)
-			{
-				string	line	=code.ReadLine();
-
-				string	[]toks	=line.Split(' ', '\t', ',');
-
-				string	tokLow	=toks[0].ToLowerInvariant();
-
-				if(mValidTypes.ContainsKey(tokLow))
-				{
-					//Variable!
-					foreach(string tok in toks)
-					{
-						if(tok == "")
-						{
-							continue;
-						}
-
-						if(!IsValidVariable(tok))
-						{
-							continue;
-						}
-
-						mVars.Add(tok);
-						mVarAddrs.Add(varAddress);
-
-						varAddress	+=mValidTypes[tokLow];
-					}
-				}
-
-				if(code.EndOfStream)
-				{
-					break;
-				}
-			}
-
-			code.BaseStream.Seek(0, SeekOrigin.Begin);
-		}
-
-		bool IsValidVariable(string varText)
-		{
-			//must begin with a letter
-			if(!char.IsLetter(varText[0]))
-			{
-				return	false;
-			}
-
-			//make sure it isn't a type
-			if(mValidTypes.ContainsKey(varText))
-			{
-				return	false;
-			}
-
-			//check for invalid characters
-			foreach(char c in varText)
-			{
-				//symbols & other strange stuff under the numbers
-				if(c < 48)
-				{
-					return	false;
-				}
-
-				//junk between numbers and letters (< > etc)
-				if(c > 57 && c < 65)
-				{
-					return	false;
-				}
-
-				//[]\^
-				if(c > 90 && c < 95)
-				{
-					return	false;
-				}
-
-				//`
-				if(c == 96)
-				{
-					return	false;
-				}
-
-				//after z
-				if(c > 122)
-				{
-					return	false;
-				}
-			}
-			return	true;
-		}
-
-
-		bool GetRegisterArg(string tok, ref UInt16 arg, int lineNum)
-		{
-			//trim reg
-			tok	=tok.Substring(3);
-
-			byte	regAddr;
-			if(!byte.TryParse(tok, out regAddr))
-			{
-				mScreen.Print("Invalid register: " + tok + " at line: " + lineNum);
-				return	false;
-			}
-
-			arg	=regAddr;
-			return	true;
-		}
-
-		bool GetNumericalArg(string tok, ref UInt16 arg, int lineNum)
-		{
-			if(!UInt16.TryParse(tok, out arg))
-			{
-				mScreen.Print("Invalid numerical constant: " + tok + " at line: " + lineNum);
-				return	false;
-			}
-			return	true;
-		}
-
-		bool GetAddressArg(string tok, ref UInt16 srcArg, int lineNum)
-		{
-			//trim bracketses
-			tok	=tok.TrimStart('[');
-			tok	=tok.TrimEnd(']');
-
-			if(!UInt16.TryParse(tok, out srcArg))
-			{
-				mScreen.Print("Invalid address: " + tok + " at line: " + lineNum);
-				return	false;
-			}
-			return	true;
-		}
 
 		void ExeWrite(Ram exe, int lineNum, byte instruction,
 						byte []argInds, UInt16 []args)
@@ -650,40 +412,6 @@ namespace UserCodeLib
 		}
 
 
-		bool	ParsePragma(string	[]toks)
-		{
-			//get pragma arg
-			string	arg		="";
-			UInt64	numArg	=0;
-			for(int i=1;i < toks.Length;i++)
-			{
-				if(toks[i] == "")
-				{
-					continue;
-				}
-
-				string	tok	=toks[i].ToLowerInvariant();
-
-				if(char.IsNumber(tok[0]))
-				{
-					UInt64.TryParse(tok, out numArg);
-					break;
-				}
-				else
-				{
-					arg	=tok;
-				}
-			}
-
-			if(arg == "datapagesize")
-			{
-				mDataPageSize	=numArg;
-			}
-
-			return	true;
-		}
-
-
 		void Init()
 		{
 //			mValidTypes.Add("byte", 1);
@@ -782,6 +510,14 @@ namespace UserCodeLib
 
 			//jle jump less or equal label
 			mInstructions.Add("jle", instIdx);			
+			mNumOperands.Add(instIdx++, 1);
+
+			//jump zero
+			mInstructions.Add("jz", instIdx);
+			mNumOperands.Add(instIdx++, 1);
+
+			//jump not zero
+			mInstructions.Add("jnz", instIdx);
 			mNumOperands.Add(instIdx++, 1);
 
 			//conditional equal mov

@@ -65,6 +65,11 @@ namespace UserCodeLib
 
 		internal void SetPointer(UInt64 loc)
 		{
+			if(loc >= mSize)
+			{
+				//problems!
+				return;
+			}
 			mCur	=loc;
 		}
 
@@ -78,34 +83,35 @@ namespace UserCodeLib
 		{
 			UInt16	ret	=mChonk[mCur++];
 
-			ret	<<=8;
-			ret	|=mChonk[mCur++];
+			byte	high	=mChonk[mCur++];
+
+			ret	|=(UInt16)(high << 8);
 
 			return	ret;
 		}
 
 		internal UInt32 ReadDWord()
 		{
-			UInt32	ret	=(UInt32)(mChonk[mCur++] << 24);
+			UInt32	ret	=(UInt32)(mChonk[mCur++]);
 			
-			ret	|=(UInt32)(mChonk[mCur++] << 16);
 			ret	|=(UInt32)(mChonk[mCur++] << 8);
-			ret	|=(UInt32)(mChonk[mCur++]);
+			ret	|=(UInt32)(mChonk[mCur++] << 16);
+			ret	|=(UInt32)(mChonk[mCur++] << 24);
 
 			return	ret;
 		}
 
 		internal UInt64 ReadQWord()
 		{
-			UInt64	ret	=(((UInt64)mChonk[mCur++]) << 56);
-			
-			ret	|=(((UInt64)mChonk[mCur++]) << 48);
-			ret	|=(((UInt64)mChonk[mCur++]) << 40);
-			ret	|=(((UInt64)mChonk[mCur++]) << 32);
-			ret	|=(((UInt64)mChonk[mCur++]) << 24);
-			ret	|=(((UInt64)mChonk[mCur++]) << 16);
+			UInt64	ret	=mChonk[mCur++];
+
 			ret	|=(((UInt64)mChonk[mCur++]) << 8);
-			ret	|=mChonk[mCur++];
+			ret	|=(((UInt64)mChonk[mCur++]) << 16);			
+			ret	|=(((UInt64)mChonk[mCur++]) << 24);
+			ret	|=(((UInt64)mChonk[mCur++]) << 32);
+			ret	|=(((UInt64)mChonk[mCur++]) << 40);
+			ret	|=(((UInt64)mChonk[mCur++]) << 48);
+			ret	|=(((UInt64)mChonk[mCur++]) << 56);
 
 			return	ret;
 		}
@@ -130,8 +136,8 @@ namespace UserCodeLib
 				return	false;
 			}
 
-			mChonk[mCur++]	=(byte)(val >> 8);
 			mChonk[mCur++]	=(byte)(val & 0xFF);
+			mChonk[mCur++]	=(byte)(val >> 8);
 
 			return	true;
 		}
@@ -143,10 +149,10 @@ namespace UserCodeLib
 				return	false;
 			}
 
-			mChonk[mCur++]	=(byte)((val >> 24) & 0xFF);
-			mChonk[mCur++]	=(byte)((val >> 16) & 0xFF);
-			mChonk[mCur++]	=(byte)((val >> 8) & 0xFF);
 			mChonk[mCur++]	=(byte)(val & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 8) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 16) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 24) & 0xFF);
 
 			return	true;
 		}
@@ -158,14 +164,14 @@ namespace UserCodeLib
 				return	false;
 			}
 
-			mChonk[mCur++]	=(byte)((val >> 56) & 0xFF);
-			mChonk[mCur++]	=(byte)((val >> 48) & 0xFF);
-			mChonk[mCur++]	=(byte)((val >> 40) & 0xFF);
-			mChonk[mCur++]	=(byte)((val >> 32) & 0xFF);
-			mChonk[mCur++]	=(byte)((val >> 24) & 0xFF);
-			mChonk[mCur++]	=(byte)((val >> 16) & 0xFF);
-			mChonk[mCur++]	=(byte)((val >> 8) & 0xFF);
 			mChonk[mCur++]	=(byte)(val & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 8) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 16) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 24) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 32) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 40) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 48) & 0xFF);
+			mChonk[mCur++]	=(byte)((val >> 56) & 0xFF);
 
 			return	true;
 		}
