@@ -1,19 +1,21 @@
 x	Proper error reporting with line numbers
 x	Numerical constants as arguments
 x	Variables
-	Endianness?  I think I did some kind of backwards byte order by accident
-	Validation of argument type per instruction?
-		Like how "number" isn't really valid for a mov destination etc
-	need more clarity in execution args
-		address / value
-	Functions
-	Writable screen device memory
-	Filesystem
-	Text editor
-	Convert register mnemonic to a numerical address via the register module
+x	Endianness?  I think I did some kind of backwards byte order by accident
+x	Convert register mnemonic to a numerical address via the register module
 x	Need a way to map multiple devices / memory chunks into asm address space
 x	Write in size of exe in exe
 x	Param to the compiler to determine size of data page (Pragma?)
+	Validation of argument type per instruction?
+x		Like how "number" isn't really valid for a mov destination etc
+	Need a stack
+	Call and Ret
+	need more clarity in execution args
+		address / value
+	Functions (x64 calling convention?  reserved call registers?)
+	Writable screen device memory
+		maybe start with a stdin / stdout kind of thing
+	Text editor?
 	string type
 	byte type
 	OS routines
@@ -23,6 +25,13 @@ x	Param to the compiler to determine size of data page (Pragma?)
 			Make directory
 			Make new file
 			Open/close file
+				open flags like create append etc, steal from C# system.io
 		List available functions?
 		List available devices
+			Ram available
+			number of screens and pointers to screen memory
+			control devices such as movement on a drone or roll for a lathe
+		Device connect / disconnect stuff
+			Detect adding of new parts
+			Might increase available mem or screens or new control stuff or sensors
 		Alloc memory pages

@@ -28,6 +28,8 @@ Asm
 		jge		label		//jump if greater than or equal
 		jl		label		//jump if less than
 		jle		label		//jump if less than or equal
+		jz		label		//jump if zero flag set
+		jnz		label		//jump if zero flag not set
 		cmove	dst, src	//mov if equal
 		cmovne	dst, src	//mov if not equal
 		cmovg	dst, src	//mov if greater than
