@@ -50,6 +50,6 @@ Asm
 	Constants
 		Just specify a number I guess?
 	Variables
-		maybe eventually?
+		type	varName	//declare at the top c style?
 	Functions
-		Someday
+		funcName	PROC	//declare function

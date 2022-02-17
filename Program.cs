@@ -25,6 +25,7 @@ namespace UserCodeLib
 			if(fs == null)
 			{
 				Console.WriteLine("Couldn't open file " + args[0]);
+				return;
 			}
 
 			Screen	scr	=new Screen(Screen.Modes.Text, 80, 80);
@@ -33,20 +34,32 @@ namespace UserCodeLib
 
 			Compiler	cmp	=new Compiler(scr);
 
-			OS	os	=new OS(0);
+			//make memory handler
+			Ram	mem	=new Ram();
 
-			Ram	mem;
-			os.Alloc(8192, AddressSpace.SpaceTypes.Code,
-						"Test program ram", out mem);
+			//this would normally be a unique id from unity or something
+			UInt64	fakeModuleID	=0xDEADD00DBAD;
 
-			cmp.Compile(sr, mem);
+			//attach a physical memory module
+			mem.AttachModule(fakeModuleID, 65535, true);			
+
+			OS	os	=new OS(0, mem, fakeModuleID);
+
+			RamChunk	proggy;
+			if(!os.Alloc(8192, out proggy))
+			{
+				Console.WriteLine("Couldn't alloc ram for compiled code!");
+				return;
+			}
+
+			cmp.Compile(sr, proggy);
 
 			sr.Close();
 			fs.Close();
 
 			CPU	cpu	=new CPU(os);
 
-			cpu.RunCode(mem);
+			cpu.RunCode(proggy);
         }
     }
 }

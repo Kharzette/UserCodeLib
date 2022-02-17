@@ -44,7 +44,7 @@ namespace UserCodeLib
 		}
 
 
-		internal bool	Compile(StreamReader code, Ram exe)
+		internal bool	Compile(StreamReader code, RamChunk exe)
 		{
 			//first write an exe magic
 			exe.WriteDWord(ExeMagic);
@@ -87,7 +87,7 @@ namespace UserCodeLib
 		}
 
 
-		bool ReplaceLabelAddrs(Ram exe)
+		bool ReplaceLabelAddrs(RamChunk exe)
 		{
 			exe.SetPointer(4);
 
@@ -111,7 +111,6 @@ namespace UserCodeLib
 				if((args & 0xF) == DstLabel)
 				{
 					//label
-//					int	labelIndex	=(int)ReadExeValue(exe);
 					int	labelIndex	=(int)exe.ReadWord();
 					if(labelIndex < 0 || labelIndex > mLabels.Count)
 					{
@@ -121,11 +120,10 @@ namespace UserCodeLib
 
 					//back up pointer
 					UInt64	pointer	=exe.GetPointer();
-					pointer	-=(UInt64)exe.GetAddressSize();
+					pointer	-=2;	//address size for 16 bit
 					exe.SetPointer(pointer);
 
 					//write proper address
-					//WriteExeValue(exe, mLabelAddrs[labelIndex], lineNum);
 					exe.WriteWord((UInt16)mLabelAddrs[labelIndex]);
 				}
 				else if((args & 0xF) == DstRegister || (args & 0xF) == DstRegPointer)
@@ -152,7 +150,6 @@ namespace UserCodeLib
 				else if((args & 0xF0) == SrcLabel)
 				{
 					//label
-//					int	labelIndex	=(int)ReadExeValue(exe);
 					int	labelIndex	=(int)exe.ReadWord();
 					if(labelIndex < 0 || labelIndex > mLabels.Count)
 					{
@@ -162,11 +159,9 @@ namespace UserCodeLib
 
 					//back up pointer
 					UInt64	pointer	=exe.GetPointer();
-					pointer	-=(UInt64)exe.GetAddressSize();
+					pointer	-=2;	//16 bit addressing
 					exe.SetPointer(pointer);
 
-					//write proper address
-					//WriteExeValue(exe, mLabelAddrs[labelIndex], lineNum);
 					exe.WriteWord((UInt16)mLabelAddrs[labelIndex]);
 				}
 				else
@@ -194,7 +189,7 @@ namespace UserCodeLib
 
 		bool ParseLine(string	codeLine,
 					   int		lineNum,
-					   Ram		exe)
+					   RamChunk	exe)
 		{
 			codeLine	=codeLine.Trim();
 
@@ -301,7 +296,7 @@ namespace UserCodeLib
 		}
 
 
-		void ExeWrite(Ram exe, int lineNum, byte instruction,
+		void ExeWrite(RamChunk exe, int lineNum, byte instruction,
 						byte []argInds, UInt16 []args)
 		{
 			int	numOperands	=mNumOperands[instruction];
@@ -357,58 +352,6 @@ namespace UserCodeLib
 			{
 				exe.WriteByte((byte)args[2]);
 			}
-		}
-
-		void WriteExeValue(Ram exe, UInt64 val, int lineNum)
-		{
-			if(exe.Is16Bit())
-			{
-				if(val > UInt16.MaxValue)
-				{
-					mScreen.Print("Warning:  Value: " + val + " too big to fit in 16 bits at line: " + lineNum);
-				}
-
-				if(!exe.WriteWord((UInt16)val))
-				{
-					mScreen.Print("Error writing to exe ram at line " + lineNum);
-				}
-			}
-			else if(exe.Is32Bit())
-			{
-				if(val > UInt16.MaxValue)
-				{
-					mScreen.Print("Warning:  Value: " + val + " too big to fit in 16 bits at line: " + lineNum);
-				}
-
-				if(!exe.WriteDWord((UInt32)val))
-				{
-					mScreen.Print("Error writing to exe ram at line " + lineNum);
-				}
-			}
-			else if(exe.Is64Bit())
-			{
-				if(!exe.WriteQWord((UInt64)val))
-				{
-					mScreen.Print("Error writing to exe ram at line " + lineNum);
-				}
-			}
-		}
-
-		UInt64	ReadExeValue(Ram exe)
-		{
-			if(exe.Is16Bit())
-			{
-				return	exe.ReadWord();
-			}
-			else if(exe.Is32Bit())
-			{
-				return	exe.ReadDWord();
-			}
-			else if(exe.Is64Bit())
-			{
-				return	exe.ReadQWord();
-			}
-			return	0;
 		}
 
 

@@ -1,0 +1,137 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder}/UserCodeLib.csproj",
+				"/property:GenerateFullPaths=true",
+				"/property:emitEntryPoint=true",
+				"/consoleloggerparameters:NoSummary"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "nasm FlagTesting.asm",
+			"command": "echo Not set up for whatever OS this is...",
+			"windows":
+			{
+				"command": "D:/Games/nasm-2.15.05/nasm.exe",
+				"args": [
+					"-fwin64",
+					"-O0",
+					"-g",
+					"FlagTesting.asm",
+					"-o FlagTesting.obj"
+				],
+			},
+			"linux":
+			{
+				"command": "nasm",
+				"args": [
+					"-felf64",
+					"-O0",
+					"-g",
+					"FlagTesting.asm"
+				]	
+			}, 
+			"options": { "cwd": "${workspaceFolder}/TestCode" },
+			"type": "process",
+			"problemMatcher": "$msCompile",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "link FlagTesting",
+			"command": "echo Not set up for whatever OS this is...",
+			"windows":
+			{
+				"command": "C:/Program Files/LLVM/bin/lld-link.exe",
+				"args": [
+					"/MACHINE:x64",
+					"/debug",
+					"/SUBSYSTEM:CONSOLE",
+					"/OUT:FlagTesting.exe",
+					"/ENTRY:main",
+					"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64/kernel32.lib",
+					"FlagTesting.obj"
+				]	
+			},
+			"linux":
+			{
+				"command": "gcc",
+				"args": [
+					"-o", "FlagTesting",
+					"-no-pie",
+					"FlagTesting.o"
+				]	
+			},
+			"type": "process",
+			"options": { "cwd": "${workspaceFolder}/TestCode" },
+			"problemMatcher": "$msCompile",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "publish",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"publish",
+				"${workspaceFolder}/UserCodeLib.csproj",
+				"/property:GenerateFullPaths=true",
+				"/consoleloggerparameters:NoSummary"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "watch",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"watch",
+				"run",
+				"${workspaceFolder}/UserCodeLib.csproj",
+				"/property:GenerateFullPaths=true",
+				"/consoleloggerparameters:NoSummary"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "C/C++: build active file",
+			"command": "echo Not set up for whatever OS this is...",
+			"windows":
+			{
+				"command": "C:\\Program Files\\LLVM\\bin\\clang.exe",
+				"args": [
+					"-fdiagnostics-color=always",
+					"-g",
+					"${file}",
+					"-o",
+					"${fileDirname}\\${fileBasenameNoExtension}.exe"
+				]	
+			},
+			"linux":
+			{
+				"command": "gcc",
+				"args": [
+					"${file}", "-o", "${fileBasenameNoExtension}"
+				]
+			},
+			"options": {
+				"cwd": "${fileDirname}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build",
+		}
+	]
+}

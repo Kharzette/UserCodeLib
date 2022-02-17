@@ -9,11 +9,11 @@ namespace UserCodeLib
 		Registers	mRegs;
 		Flags		mFlags	=new Flags();
 
-		Ram	mCurCodePage;
+		RamChunk	mCurCodePage;
 
 		OS	mOS;
 
-		delegate void Instruction(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data);
+		delegate void Instruction(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data);
 
 		Dictionary<byte, Instruction>	mInstructionTable	=new Dictionary<byte, Instruction>();
 
@@ -78,7 +78,7 @@ namespace UserCodeLib
 		}
 
 
-		internal void RunCode(Ram code)
+		internal void RunCode(RamChunk code)
 		{
 			code.SetPointer(0);
 
@@ -96,9 +96,12 @@ namespace UserCodeLib
 			UInt64	dataSize	=code.ReadQWord();
 
 			//alloc a data page for the exe
-			Ram	data;
-			mOS.Alloc((UInt16)dataSize, AddressSpace.SpaceTypes.Data,
-						"Program data", out data);
+			RamChunk	data;
+			if(!mOS.Alloc((UInt16)dataSize, out data))
+			{
+				mOS.Print("Couldn't alloc data chunk size " + dataSize);
+				return;
+			}
 
 			for(;;)
 			{
@@ -158,7 +161,7 @@ namespace UserCodeLib
 		}
 
 
-		UInt16 GetDstAddress(UInt16 dst, byte args, Ram data)
+		UInt16 GetDstAddress(UInt16 dst, byte args, RamChunk data)
 		{
 			if((args & 0x0F) == DstPointer)
 			{
@@ -176,7 +179,7 @@ namespace UserCodeLib
 		}
 
 
-		UInt16 GetDstValue(UInt16 dst, byte args, Ram data)
+		UInt16 GetDstValue(UInt16 dst, byte args, RamChunk data)
 		{
 			if((args & 0x0F) == DstRegister)
 			{
@@ -201,7 +204,7 @@ namespace UserCodeLib
 		}
 
 
-		UInt16 GetSrcValue(UInt16 src, byte args, Ram data)
+		UInt16 GetSrcValue(UInt16 src, byte args, RamChunk data)
 		{
 			//get src val
 			UInt16	srcVal	=0;
@@ -228,7 +231,7 @@ namespace UserCodeLib
 		}
 
 
-		void WriteDst(UInt16 val, byte args, UInt16 dst, Ram data)
+		void WriteDst(UInt16 val, byte args, UInt16 dst, RamChunk data)
 		{
 			if((args & 0x0F) == DstRegister)
 			{
@@ -253,7 +256,7 @@ namespace UserCodeLib
 		}
 
 
-		void Mov(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Mov(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 
@@ -261,7 +264,7 @@ namespace UserCodeLib
 		}
 
 
-		void AddrOf(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void AddrOf(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if((args & 0xF0) != SrcVariable)
 			{
@@ -271,7 +274,7 @@ namespace UserCodeLib
 		}
 
 
-		void Add(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Add(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 			UInt16	dstVal	=GetDstValue(dst, args, data);
@@ -281,7 +284,7 @@ namespace UserCodeLib
 		}
 
 
-		void Mul(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Mul(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 			UInt16	dstVal	=GetDstValue(dst, args, data);
@@ -291,7 +294,7 @@ namespace UserCodeLib
 		}
 
 
-		void IMul(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void IMul(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			Int16	srcVal	=(Int16)GetSrcValue(src, args, data);
 			Int16	dstVal	=(Int16)GetDstValue(dst, args, data);
@@ -301,7 +304,7 @@ namespace UserCodeLib
 		}
 
 
-		void Div(byte args, UInt16 dst, UInt16 src, UInt16 remainder, Ram data)
+		void Div(byte args, UInt16 dst, UInt16 src, UInt16 remainder, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 			UInt16	dstVal	=GetDstValue(dst, args, data);
@@ -312,7 +315,7 @@ namespace UserCodeLib
 		}
 
 
-		void IDiv(byte args, UInt16 dst, UInt16 src, UInt16 remainder, Ram data)
+		void IDiv(byte args, UInt16 dst, UInt16 src, UInt16 remainder, RamChunk data)
 		{
 			Int16	srcVal	=(Int16)GetSrcValue(src, args, data);
 			Int16	dstVal	=(Int16)GetDstValue(dst, args, data);
@@ -323,7 +326,7 @@ namespace UserCodeLib
 		}
 
 
-		void Inc(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Inc(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
@@ -334,7 +337,7 @@ namespace UserCodeLib
 		}
 
 
-		void Dec(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Dec(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
@@ -345,7 +348,7 @@ namespace UserCodeLib
 		}
 
 
-		void Neg(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Neg(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
@@ -360,7 +363,7 @@ namespace UserCodeLib
 		}
 
 
-		void Not(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Not(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	dstVal	=GetDstValue(dst, args, data);
 
@@ -371,7 +374,7 @@ namespace UserCodeLib
 		}
 
 
-		void Xor(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Xor(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 			UInt16	dstVal	=GetDstValue(dst, args, data);
@@ -383,7 +386,7 @@ namespace UserCodeLib
 		}
 
 
-		void Or(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Or(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 			UInt16	dstVal	=GetDstValue(dst, args, data);
@@ -393,7 +396,7 @@ namespace UserCodeLib
 		}
 
 
-		void And(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void And(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 			UInt16	dstVal	=GetDstValue(dst, args, data);
@@ -403,7 +406,7 @@ namespace UserCodeLib
 		}
 
 
-		void Tst(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Tst(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 			UInt16	dstVal	=GetDstValue(dst, args, data);
@@ -412,7 +415,7 @@ namespace UserCodeLib
 		}
 
 
-		void Cmp(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Cmp(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			UInt16	srcVal	=GetSrcValue(src, args, data);
 			UInt16	dstVal	=GetDstValue(dst, args, data);
@@ -421,7 +424,7 @@ namespace UserCodeLib
 		}
 
 
-		void Jmp(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Jmp(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			//can't remember if dst arrives as the memory location
 			//or if it is still an index
@@ -429,7 +432,7 @@ namespace UserCodeLib
 		}
 
 
-		void Je(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Je(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetZero())
 			{
@@ -438,7 +441,7 @@ namespace UserCodeLib
 		}
 
 
-		void Jne(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Jne(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(!mFlags.GetZero())
 			{
@@ -447,7 +450,7 @@ namespace UserCodeLib
 		}
 
 
-		void Jg(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Jg(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(!mFlags.GetZero() && mFlags.GetSign() == mFlags.GetOverFlow())
 			{
@@ -456,7 +459,7 @@ namespace UserCodeLib
 		}
 
 
-		void Jge(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Jge(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetSign() == mFlags.GetOverFlow())
 			{
@@ -465,7 +468,7 @@ namespace UserCodeLib
 		}
 
 
-		void Jl(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Jl(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetSign() != mFlags.GetOverFlow())
 			{
@@ -474,7 +477,7 @@ namespace UserCodeLib
 		}
 
 
-		void Jle(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Jle(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetZero() || mFlags.GetSign() != mFlags.GetOverFlow())
 			{
@@ -483,7 +486,7 @@ namespace UserCodeLib
 		}
 
 
-		void Jz(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Jz(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetZero())
 			{
@@ -492,7 +495,7 @@ namespace UserCodeLib
 		}
 
 
-		void Jnz(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void Jnz(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(!mFlags.GetZero())
 			{
@@ -501,7 +504,7 @@ namespace UserCodeLib
 		}
 
 
-		void CMovE(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void CMovE(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetZero())
 			{
@@ -510,7 +513,7 @@ namespace UserCodeLib
 		}
 
 
-		void CMovNE(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void CMovNE(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(!mFlags.GetZero())
 			{
@@ -519,7 +522,7 @@ namespace UserCodeLib
 		}
 
 
-		void CMovG(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void CMovG(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(!mFlags.GetZero() && mFlags.GetSign() == mFlags.GetOverFlow())
 			{
@@ -528,7 +531,7 @@ namespace UserCodeLib
 		}
 
 
-		void CMovGE(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void CMovGE(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetSign() == mFlags.GetOverFlow())
 			{
@@ -537,7 +540,7 @@ namespace UserCodeLib
 		}
 
 
-		void CMovL(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void CMovL(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetSign() != mFlags.GetOverFlow())
 			{
@@ -546,30 +549,12 @@ namespace UserCodeLib
 		}
 
 
-		void CMovLE(byte args, UInt16 dst, UInt16 src, UInt16 opt, Ram data)
+		void CMovLE(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
 		{
 			if(mFlags.GetZero() || mFlags.GetSign() != mFlags.GetOverFlow())
 			{
 				Mov(args, dst, src, opt, data);
 			}
-		}
-
-
-		UInt64	ReadExeValue(Ram exe)
-		{
-			if(exe.Is16Bit())
-			{
-				return	exe.ReadWord();
-			}
-			else if(exe.Is32Bit())
-			{
-				return	exe.ReadDWord();
-			}
-			else if(exe.Is64Bit())
-			{
-				return	exe.ReadQWord();
-			}
-			return	0;
 		}
 	}
 }

@@ -1,66 +1,116 @@
 using System;
+using System.Collections.Generic;
+
 
 namespace UserCodeLib
 {
-	internal class Ram
+	//one physical block of ram, tied to an ingame module
+	//be it mosfet, optical, quantum etc
+	internal class RamModule
+	{
+		UInt64	mUID;
+		UInt64	mTotalSize;		//in bytes
+		bool	mbVolatile;		//lose it when unpowered?
+
+		//could also have speed / latency / failure stuff in here
+
+		//indexed by page number
+		Dictionary<UInt16, RamChunk>	mChunks	=new Dictionary<UInt16, RamChunk>();
+
+
+		internal RamModule(UInt64 id, UInt64 size, bool bVolatile)
+		{
+			mTotalSize	=size;
+			mbVolatile	=bVolatile;
+			mUID		=id;
+		}
+
+
+		internal UInt64	GetID()
+		{
+			return	mUID;
+		}
+
+		internal RamChunk GetChunk(UInt16 id)
+		{
+			if(mChunks.ContainsKey(id))
+			{
+				return	mChunks[id];
+			}
+			return	null;
+		}
+
+		internal UInt64	GetFreeBytes()
+		{
+			UInt64	ret	=mTotalSize;
+
+			foreach(KeyValuePair<UInt16, RamChunk> chnk in mChunks)
+			{
+				ret	-=chnk.Value.GetSize();
+			}
+			return	ret;
+		}
+
+
+		internal bool CreateChunk(UInt64 size, out UInt16 page)
+		{
+			UInt64	free	=GetFreeBytes();
+
+			page	=0xFFFF;
+
+			if(size > free)
+			{
+				return	false;	//not gnouf space
+			}
+
+			RamChunk	chonker	=new RamChunk();
+
+			while(true)
+			{
+				UInt16	pn	=(UInt16)Random.Shared.Next(UInt16.MaxValue);
+
+				if(!mChunks.ContainsKey(pn))
+				{
+					page	=pn;
+					break;
+				}
+			}
+
+			chonker.Init(size, page);
+
+			mChunks.Add(page, chonker);
+
+			return	true;
+		}
+	}
+
+	//individual allocated chunks of ram
+	//should fit within its module
+	internal class RamChunk
 	{
 		byte	[]mChonk;
 		UInt16	mPage;
 		UInt64	mSize;
 		UInt64	mCur;	//pointer to current spot in ram
 
-		byte	mAddressing;	//0 is 16bit, 1 is 32bit, 2 is 64bit
 
-
-		internal void Init(UInt64 size, byte addressing, UInt16 page)
+		internal void Init(UInt64 size, UInt16 page)
 		{
 			mSize	=size;
 			mPage	=page;
 
 			mChonk	=new byte[size];
-
-			if(addressing < 0 || addressing > 2)
-			{
-				//bad addressing
-			}
-			mAddressing	=addressing;
 		}
 
 
-		internal bool Is16Bit()
+		internal UInt64 GetSize()
 		{
-			return	(mAddressing == 0);
-		}
-
-		internal bool Is32Bit()
-		{
-			return	((mAddressing & 1) != 0);
-		}
-
-		internal bool Is64Bit()
-		{
-			return	((mAddressing & 2) != 0);
+			return	mSize;
 		}
 
 		internal UInt64 GetPointer()
 		{
 			return	mCur;
-		}
-
-		internal int GetAddressSize()
-		{
-			if(Is16Bit())
-			{
-				return	2;
-			}
-			else if(Is32Bit())
-			{
-				return	4;
-			}
-			else
-			{
-				return	8;
-			}
 		}
 
 		internal void SetPointer(UInt64 loc)
@@ -174,6 +224,67 @@ namespace UserCodeLib
 			mChonk[mCur++]	=(byte)((val >> 56) & 0xFF);
 
 			return	true;
+		}
+	}
+
+
+	//an overall ram module manager, tied to the overall computer
+	//should be one per computer
+	internal class Ram
+	{
+		List<RamModule>	mModules	=new List<RamModule>();
+
+		internal event EventHandler	eAttach;
+		internal event EventHandler	eDetach;
+
+
+		internal RamModule GetModule(UInt64 id)
+		{
+			foreach(RamModule rm in mModules)
+			{
+				if(rm.GetID() == id)
+				{
+					return	rm;
+				}
+			}
+			return	null;
+		}
+
+
+		internal void AttachModule(UInt64 mid, UInt64 size, bool bVolatile)
+		{
+			RamModule	rm	=new RamModule(mid, size, bVolatile);
+
+			mModules.Add(rm);
+
+			Nullable<UInt64>	id	=mid;
+
+			eAttach?.Invoke(id, null);
+		}
+
+
+		internal void DetachModule(UInt64 mid)
+		{
+			int	idx	=-1;
+			for(int i=0;i < mModules.Count;i++)
+			{
+				if(mModules[i].GetID() == mid)
+				{
+					idx	=i;
+					break;
+				}
+			}
+
+			if(idx < 0)
+			{
+				return;
+			}
+
+			mModules.RemoveAt(idx);
+
+			Nullable<UInt64>	id	=mid;
+
+			eDetach?.Invoke(id, null);
 		}
 	}
 }

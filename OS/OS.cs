@@ -5,37 +5,37 @@ namespace UserCodeLib
 {
 	internal class OS
 	{
-		Ram	mRam;	//os mem page for biosy code
-
-		AddressSpace	mSpace;	//for handing out pages
+		Ram	mRam;	//machine memory controller
 
 		byte	mAddrBits;	//0 for 16, 1 for 32, 2 for 64
 
+		UInt64		mBiosModule;	//ram module that bios lives on
+		RamChunk	mBiosChunk;		//ram chunk that bios lives on
 
-		internal OS(byte bits)
+
+		internal OS(byte bits, Ram ram, UInt64 moduleID)
 		{
 			mAddrBits	=bits;
+			mRam		=ram;
+			mBiosModule	=moduleID;
 
-			mSpace	=new AddressSpace(bits);
-
-			Alloc(8192, AddressSpace.SpaceTypes.Code,
-					"OS Biosy Functions", out mRam);
+			//alloc space for bios code
+			Alloc(8192, out mBiosChunk);
 		}
 
 
-		internal bool Alloc(UInt16 size, AddressSpace.SpaceTypes kind,
-							string desc, out Ram mem)
+		internal bool Alloc(UInt64 size, out RamChunk chonk)
 		{
-			mem	=new Ram();
-
+			RamModule	rm	=mRam.GetModule(mBiosModule);			
+			
 			UInt16	page;
-			if(!mSpace.MakePage(kind, desc, out page))
+			if(rm.CreateChunk(size, out page))
 			{
-				return	false;
+				chonk	=rm.GetChunk(page);
+				return	true;
 			}
-
-			mem.Init(size, mAddrBits, page);
-			return	true;
+			chonk	=null;
+			return	false;
 		}
 
 

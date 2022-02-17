@@ -1,0 +1,115 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Linux (gdb) current file",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/TestCode/${fileBasenameNoExtension}",
+			"args": [],
+			"stopAtEntry": true,
+			"cwd": "${fileDirname}",
+			"environment": [],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				},
+				{
+					"description":  "Set Disassembly Flavor to Intel",
+					"text": "-gdb-set disassembly-flavor intel",
+					"ignoreFailures": true
+				}
+			]
+		},
+		{
+			"name": "blort Win64 Launch",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/blort.exe",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${fileDirname}",
+			"environment": [],
+			"console": "externalTerminal"
+		},
+		{
+			"name": "FlagTesting Win64 Launch",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/FlagTesting.exe",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${fileDirname}",
+			"environment": [],
+			"console": "externalTerminal"
+		},
+		{
+			"type": "lldb-mi",
+			"request": "launch",
+			"name": "LLDB FlagTesting",
+			"target": "FlagTesting.exe",
+			"debugger_args": ["--stop-at-entry"],
+			"cwd": "${workspaceRoot}",
+			"valuesFormatting": "parseText",
+//			"lldbmipath": "C:/Program Files/llvm/bin/lldb-vscode.exe",
+			"terminal": "",
+			"printCalls": true
+		},
+		{
+			"type": "gdb",
+			"request": "launch",
+			"name": "GDB FlagTesting",
+			"target": "${workspaceFolder}/FlagTesting.exe",
+			"cwd": "${workspaceRoot}",
+			"valuesFormatting": "parseText",
+			"gdbpath": "C:/tools/msys64/mingw64/bin/gdb.exe",
+			"debugger_args": ["info breakpoints"]
+		},
+		{
+			"name": "Broken C++ plugin debug",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/FlagTesting.exe",
+			"cwd": "${workspaceFolder}",
+			"stopAtEntry": false,
+			"linux": {
+			  "MIMode": "gdb",
+			  "miDebuggerPath": "/usr/bin/gdb"
+			},
+			"osx": {
+			  "MIMode": "lldb"
+			},
+			"windows": {
+			  "MIMode": "lldb",
+//			  "miDebuggerPath": "C:\\tools\\msys64\\mingw64\\bin\\gdb.exe"
+			  "miDebuggerPath": "C:\\Program Files\\llvm\\bin\\lldb-vscode.exe"
+			},
+			"targetArchitecture": "x64"
+		  },		  
+		  {
+			// Use IntelliSense to find out which attributes exist for C# debugging
+			// Use hover for the description of the existing attributes
+			// For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
+			"name": ".NET Core Launch (console)",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build",
+			// If you have changed target frameworks, make sure to update the program path.
+			"program": "${workspaceFolder}/bin/Debug/net6.0/UserCodeLib.dll",
+			"args": ["blort.asm"],
+			"cwd": "${workspaceFolder}",
+			// For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
+			"console": "internalConsole",
+			"stopAtEntry": false
+		},
+		{
+			"name": ".NET Core Attach",
+			"type": "coreclr",
+			"request": "attach"
+		}
+	]
+}
