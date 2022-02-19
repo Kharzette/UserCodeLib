@@ -30,6 +30,8 @@ void	main(void)
 
 	srand(time(&tyme));
 
+	puts("blort");
+
 	int	halfRMAX	=RAND_MAX >> 1;
 
 	for(int i=0;i < 5;i++)

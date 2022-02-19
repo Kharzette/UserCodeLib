@@ -1,11 +1,19 @@
 ;x64 asm for testing flags and other stuff I'm making
-          global    main
-          extern    puts
+		global		main
+		extern		puts
+		extern		exit
 
-          section   .text
-main:                                       ; This is called by the C library startup code
-          mov       rdi, message            ; First integer (or pointer) argument in rdi
-          call      puts                    ; puts(message)
-          ret                               ; Return from main back into C library wrapper
+section	.text
+main:
+		;for linux, puts expects this argument in rdi
+		;not really sure which is correct
+		mov		rcx, message
+		call	puts
+
+		;exit is needed here on windows or ret jumps into
+		;garbage code, not sure if that is nasm's fault or what
+		call	exit
+
+section	.data
 message:
-          db        "Goblinoids", 0        ; Note strings must be terminated with 0 in C
+		db			'Goblinoids', 0
