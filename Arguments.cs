@@ -102,6 +102,10 @@ namespace UserCodeLib
 			{
 				mDataPageSize	=numArg;
 			}
+			else if(arg == "stacksize")
+			{
+				mStackSize	=numArg;
+			}
 
 			return	true;
 		}

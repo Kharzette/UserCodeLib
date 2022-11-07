@@ -3,7 +3,7 @@ Goals
 	Progress from simple assembly to higher level languages
 	Access to in-game devices such as displays or vehicle steering / throttle
 	Limited speed / storage based on how the in-game computer was built
-Asm
+Asm	
 	Instructions
 		mov		dst, src
 		addrOf	var, dst	//store address of variable var in dst
@@ -37,6 +37,8 @@ Asm
 		cmovl	dst, src	//mov if less than
 		cmovle	dst, src	//mov if less than or equal
 		call	dst, src	//function call to address in dst, optional pagenum in src
+		push	type		//push type on stack (hidden?)
+		ret					//return from call
 	Flags
 		CF	carry
 		ZF	zero
@@ -44,12 +46,25 @@ Asm
 		OF	overflow
 	Labels
 		word with a : at the end
-		Can be used as a jmp target or for self modifying code
-	Addresses
+		Can be used as a jmp target or for self modifying code maybe?
+	Numeric arguments
+		such as:
+			#directly use the value
+			no # use the number as an address
+			mov	goblins, 69		//move 69 into goblins, like c: goblins=69;
+			mov	[goblins], 69	//like c: *goblins=69; (may not allow this)
+			mov	reg00, goblins	//
 		put in [] brackets
 	Constants
 		Just specify a number I guess?
 	Variables
-		type	varName	//declare at the top c style?
+		user should handle them via push/pop or labels for globals
 	Functions
-		funcName	PROC	//declare function
+		PROC	funcName	//declare function
+	Types
+		69
+	Registers
+		No partial registers, too complicated
+		reg00 - regNN
+		stk		stack pointer
+		rip		instruction pointer

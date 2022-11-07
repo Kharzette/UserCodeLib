@@ -24,9 +24,16 @@ namespace UserCodeLib
 		}
 
 
+		//just use same module as the bios lives on
 		internal bool Alloc(UInt64 size, out RamChunk chonk)
 		{
-			RamModule	rm	=mRam.GetModule(mBiosModule);			
+			return	Alloc(size, mBiosModule, out chonk);
+		}
+
+
+		internal bool Alloc(UInt64 size, UInt64 moduleID, out RamChunk chonk)
+		{
+			RamModule	rm	=mRam.GetModule(moduleID);			
 			
 			UInt16	page;
 			if(rm.CreateChunk(size, out page))

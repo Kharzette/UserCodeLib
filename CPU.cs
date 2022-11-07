@@ -8,6 +8,7 @@ namespace UserCodeLib
 	{
 		Registers	mRegs;
 		Flags		mFlags	=new Flags();
+		Stack		mStack;
 
 		RamChunk	mCurCodePage;
 
@@ -20,6 +21,12 @@ namespace UserCodeLib
 		const int		Num16Regs		=12;
 		const int		Num32Regs		=24;
 		const int		Num64Regs		=32;
+		const int		StackReg16		=11;			//alias for stack pointer
+		const int		StackReg32		=23;			//alias for stack pointer
+		const int		StackReg64		=31;			//alias for stack pointer
+		const int		PCReg16			=10;			//alias for program counter
+		const int		PCReg32			=22;			//alias for program counter
+		const int		PCReg64			=30;			//alias for program counter
 		const UInt32	ExeMagic		=0xF00CF00D;	//exe marker
 		const byte		DstRegister		=1;				//ex: mov reg00, reg01
 		const byte		DstPointer		=2;				//ex: mov [69], reg00
@@ -40,6 +47,7 @@ namespace UserCodeLib
 			mOS	=os;
 
 			mRegs	=new Registers();
+			mStack	=new Stack();
 
 			mRegs.Init(Num16Regs, Num32Regs, Num64Regs);
 
@@ -75,6 +83,7 @@ namespace UserCodeLib
 			mInstructionTable.Add(idx++, CMovGE);
 			mInstructionTable.Add(idx++, CMovL);
 			mInstructionTable.Add(idx++, CMovLE);
+			mInstructionTable.Add(idx++, Push);
 		}
 
 
@@ -94,6 +103,9 @@ namespace UserCodeLib
 			//sizes stored at the top
 			UInt64	exeSize		=code.ReadQWord();
 			UInt64	dataSize	=code.ReadQWord();
+			UInt64	stackSize	=code.ReadQWord();
+
+			mStack.Init(stackSize);
 
 			//alloc a data page for the exe
 			RamChunk	data;
@@ -555,6 +567,12 @@ namespace UserCodeLib
 			{
 				Mov(args, dst, src, opt, data);
 			}
+		}
+
+
+		void Push(byte args, UInt16 dst, UInt16 src, UInt16 opt, RamChunk data)
+		{
+			Mov(args, dst, src, opt, data);
 		}
 	}
 }

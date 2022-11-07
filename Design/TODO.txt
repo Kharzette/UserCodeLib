@@ -9,7 +9,11 @@ x	Param to the compiler to determine size of data page (Pragma?)
 	Validation of argument type per instruction?
 x		Like how "number" isn't really valid for a mov destination etc
 	Need a stack
+	Need a program counter
+	need a stack pointer register
+	Maybe alias register numbers to special registers like stack pointer?
 	Call and Ret
+	Switch to open source risc-v?
 	need more clarity in execution args
 		address / value
 	Functions (x64 calling convention?  reserved call registers?)

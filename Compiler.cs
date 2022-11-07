@@ -10,35 +10,42 @@ namespace UserCodeLib
 		Dictionary<string, byte>	mInstructions	=new Dictionary<string, byte>();
 		Dictionary<byte, int>		mNumOperands	=new Dictionary<byte, int>();
 		Dictionary<string, byte>	mValidTypes		=new Dictionary<string, byte>();
+		Dictionary<int, int>		mTypeSizes		=new Dictionary<int, int>();
 
 		//file data
-		List<string>	mLabels, mVars;
-		List<UInt16>	mLabelAddrs, mVarAddrs;
-		UInt64			mDataPageSize;
+		List<string>	mLabels;
+		List<UInt16>	mLabelAddrs;
+		UInt64			mDataPageSize, mStackSize;
+
+		//track local variables
+		Dictionary<string, int>		mStackVarPositions	=new Dictionary<string, int>();
+		Dictionary<string, byte>	mStackVarTypes		=new Dictionary<string, byte>();
 
 		Screen	mScreen;
 
-		const UInt32	ExeMagic		=0xF00CF00D;	//exe marker
-		const UInt16	StartVarAddr	=8;				//first address for variables
-		const UInt64	DefaultDataPage	=1024;			//1k default data page
-		const byte		DstRegister		=1;				//ex: mov reg00, something
-		const byte		DstPointer		=2;				//ex: mov [69], reg00
-		const byte		DstLabel		=3;				//ex: jmp label
-		const byte		DstNumber		=4;				//ex: cmp 4, 5
-		const byte		DstRegPointer	=5;				//ex: mov [reg00], 69
-		const byte		DstVariable		=6;				//ex: mov i, reg00
-		const byte		SrcRegister		=DstRegister << 4;		//ex: mov reg00, reg01
-		const byte		SrcPointer		=DstPointer << 4;		//ex: mov reg00, [69]
-		const byte		SrcLabel		=DstLabel << 4;			//ex: mov reg00, label
-		const byte		SrcNumber		=DstNumber << 4;		//ex: mov reg00, 7
-		const byte		SrcRegPointer	=DstRegPointer << 4;	//ex: mov reg00, [reg01]
-		const byte		SrcVariable		=DstVariable << 4;		//ex: mov reg00, i
+		const UInt32	ExeMagic			=0xF00CF00D;	//exe marker
+		const UInt16	StartVarAddr		=8;				//first address for variables
+		const UInt64	DefaultDataPage		=1024;			//1k default data page
+		const UInt64	DefaultStackSize	=1024;			//1k default stack
+		const byte		DstRegister			=1;				//ex: mov reg00, something
+		const byte		DstPointer			=2;				//ex: mov [69], reg00
+		const byte		DstLabel			=3;				//ex: jmp label
+		const byte		DstNumber			=4;				//ex: cmp 4, 5
+		const byte		DstRegPointer		=5;				//ex: mov [reg00], 69
+		const byte		DstVariable			=6;				//ex: mov i, reg00
+		const byte		SrcRegister			=DstRegister << 4;		//ex: mov reg00, reg01
+		const byte		SrcPointer			=DstPointer << 4;		//ex: mov reg00, [69]
+		const byte		SrcLabel			=DstLabel << 4;			//ex: mov reg00, label
+		const byte		SrcNumber			=DstNumber << 4;		//ex: mov reg00, 7
+		const byte		SrcRegPointer		=DstRegPointer << 4;	//ex: mov reg00, [reg01]
+		const byte		SrcVariable			=DstVariable << 4;		//ex: mov reg00, i
 
 
 		internal Compiler(Screen scr)
 		{
 			mScreen			=scr;
 			mDataPageSize	=DefaultDataPage;
+			mStackSize		=DefaultStackSize;
 
 			Init();
 		}
@@ -56,12 +63,16 @@ namespace UserCodeLib
 			//skip exe dword, size qword, data size qword
 			exe.SetPointer(4 + 8 + 8);
 
+			//stack var tracking
+			int			stackVarPosition	=0;	//track where stack variables point to
+			List<int>	stackSizes			=new List<int>();
+
 			//parse lines
 			for(int i=0;;i++)
 			{
 				string	line	=code.ReadLine();
 
-				if(!ParseLine(line, i, exe))
+				if(!ParseLine(line, i, ref stackVarPosition, stackSizes, exe))
 				{
 					return	false;
 				}
@@ -82,6 +93,9 @@ namespace UserCodeLib
 			//write size of data page
 			exe.WriteQWord(mDataPageSize);
 
+			//write stack size
+			exe.WriteQWord(mStackSize);
+
 			//the addresses of labels will be known now
 			return	ReplaceLabelAddrs(exe);
 		}
@@ -94,8 +108,8 @@ namespace UserCodeLib
 			UInt64	endExe	=exe.ReadQWord();
 
 			//buzz through compiled code and fix labels
-			//skip exe number, size qword, and data size qword
-			exe.SetPointer(4 + 8 + 8);
+			//skip exe number, size qword, data size qword, and stack size qword
+			exe.SetPointer(4 + 8 + 8 + 8);
 
 			for(int lineNum=0;;lineNum++)
 			{
@@ -187,9 +201,11 @@ namespace UserCodeLib
 		}
 
 
-		bool ParseLine(string	codeLine,
-					   int		lineNum,
-					   RamChunk	exe)
+		bool ParseLine(string		codeLine,
+					   int			lineNum,
+					   ref int		stackPos,
+					   List<int>	stackSizes,
+					   RamChunk		exe)
 		{
 			codeLine	=codeLine.Trim();
 
@@ -226,6 +242,42 @@ namespace UserCodeLib
 
 			byte	instruction	=0;
 			string	lowerTok	=toks[0].ToLowerInvariant();
+
+			if(lowerTok == "local")
+			{
+				//stack variable
+				if(toks.Length < 3)
+				{
+					mScreen.Print("bad variable declaration on line: " + lineNum);
+					return	false;
+				}
+
+				//grab type
+				lowerTok	=toks[1].ToLowerInvariant();
+				if(!mValidTypes.ContainsKey(lowerTok))
+				{
+					mScreen.Print("bad variable type on line: " + lineNum);
+					return	false;
+				}
+
+				instruction	=mInstructions["push"];
+
+				byte	typeCode	=mValidTypes[lowerTok];
+
+				//write a push
+				exe.WriteByte(instruction);
+				exe.WriteByte(typeCode);
+
+				//store variable name and stack pos and type
+				mStackVarPositions.Add(toks[2], stackPos);
+				mStackVarTypes.Add(toks[2], typeCode);
+
+				//will have to pop all these when function returns
+				stackPos	+=mTypeSizes[typeCode];
+
+				return	true;
+			}
+
 
 			if(lowerTok.StartsWith("#pragma"))
 			{
@@ -357,9 +409,12 @@ namespace UserCodeLib
 
 		void Init()
 		{
-//			mValidTypes.Add("byte", 1);
-			mValidTypes.Add("int16", 2);
+			mValidTypes.Add("byte", 1);
+			mValidTypes.Add("int16", 2);	//signed and unsigned differences?
 			mValidTypes.Add("uint16", 2);
+
+			mTypeSizes.Add(1, 1);
+			mTypeSizes.Add(2, 2);
 
 			//count instructions
 			byte	instIdx	=0;
@@ -486,6 +541,10 @@ namespace UserCodeLib
 			//conditional less or equal mov
 			mInstructions.Add("cmovle", instIdx);
 			mNumOperands.Add(instIdx++, 2);
+
+			//push onto stack, might be hidden
+			mInstructions.Add("push", instIdx);
+			mNumOperands.Add(instIdx++, 1);
 		}
 	}
 }
